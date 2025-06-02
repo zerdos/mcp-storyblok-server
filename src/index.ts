@@ -4,7 +4,7 @@ import { z } from "zod";
 
 // Create the MCP server
 const server = new McpServer({
-  name: "skeleton-manager",
+  name: "storyblok-server",
   version: "1.0.0",
 });
 
