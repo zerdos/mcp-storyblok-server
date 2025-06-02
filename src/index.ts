@@ -72,9 +72,8 @@ server.tool(
         content: [
           {
             type: "text",
-            text: `Error: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
+            text: `Error: ${error instanceof Error ? error.message : String(error)
+              }`,
           },
         ],
       };
@@ -406,13 +405,379 @@ server.tool(
   }
 );
 
+// PUBLISHING LIFECYCLE TOOLS
+
+server.tool(
+  "unpublish-story",
+  "Unpublishes a story in Storyblok",
+  {
+    id: z.string().describe("Story ID")
+  },
+  async ({ id }) => {
+    try {
+      if (!STORYBLOK_SPACE_ID) {
+        throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+      }
+
+      const response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${STORYBLOK_SPACE_ID}/stories/${id}/unpublish`,
+        {
+          method: 'POST',
+          headers: getManagementHeaders()
+        }
+      );
+
+      const data = await handleApiResponse(response);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      console.error("Error in unpublish-story tool:", error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
+      };
+    }
+  }
+);
+
+server.tool(
+  "get-story-versions",
+  "Gets all versions of a story",
+  {
+    id: z.string().describe("Story ID")
+  },
+  async ({ id }) => {
+    try {
+      if (!STORYBLOK_SPACE_ID) {
+        throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+      }
+
+      const response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${STORYBLOK_SPACE_ID}/stories/${id}/versions`,
+        {
+          headers: getManagementHeaders()
+        }
+      );
+
+      const data = await handleApiResponse(response);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      console.error("Error in get-story-versions tool:", error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
+      };
+    }
+  }
+);
+
+server.tool(
+  "restore-story",
+  "Restores a story to a specific version",
+  {
+    id: z.string().describe("Story ID"),
+    version_id: z.string().describe("Version ID to restore to")
+  },
+  async ({ id, version_id }) => {
+    try {
+      if (!STORYBLOK_SPACE_ID) {
+        throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+      }
+
+      const response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${STORYBLOK_SPACE_ID}/stories/${id}/restore/${version_id}`,
+        {
+          method: 'POST',
+          headers: getManagementHeaders()
+        }
+      );
+
+      const data = await handleApiResponse(response);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      console.error("Error in restore-story tool:", error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
+      };
+    }
+  }
+);
+
+// SCHEDULED RELEASES TOOLS
+
+server.tool(
+  "fetch-releases",
+  "Fetches all releases from Storyblok space",
+  {
+    page: z.number().optional().describe("Page number for pagination (default: 1)"),
+    per_page: z.number().optional().describe("Number of releases per page (default: 25, max: 100)")
+  },
+  async ({ page = 1, per_page = 25 }) => {
+    try {
+      if (!STORYBLOK_SPACE_ID) {
+        throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+      }
+
+      const params = new URLSearchParams({
+        page: page.toString(),
+        per_page: Math.min(per_page, 100).toString()
+      });
+
+      const response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${STORYBLOK_SPACE_ID}/releases?${params}`,
+        { headers: getManagementHeaders() }
+      );
+
+      const data = await handleApiResponse(response);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      console.error("Error in fetch-releases tool:", error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
+      };
+    }
+  }
+);
+
+server.tool(
+  "create-release",
+  "Creates a new release in Storyblok",
+  {
+    name: z.string().describe("Release name"),
+    publish_at: z.string().optional().describe("ISO date string for scheduled publishing")
+  },
+  async ({ name, publish_at }) => {
+    try {
+      if (!STORYBLOK_SPACE_ID) {
+        throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+      }
+
+      const releaseData: Record<string, unknown> = { name };
+      if (publish_at) releaseData.publish_at = publish_at;
+
+      const response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${STORYBLOK_SPACE_ID}/releases`,
+        {
+          method: 'POST',
+          headers: getManagementHeaders(),
+          body: JSON.stringify({ release: releaseData })
+        }
+      );
+
+      const data = await handleApiResponse(response);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      console.error("Error in create-release tool:", error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
+      };
+    }
+  }
+);
+
+server.tool(
+  "add-story-to-release",
+  "Adds a story to an existing release",
+  {
+    release_id: z.string().describe("Release ID"),
+    story_id: z.string().describe("Story ID")
+  },
+  async ({ release_id, story_id }) => {
+    try {
+      if (!STORYBLOK_SPACE_ID) {
+        throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+      }
+
+      const response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${STORYBLOK_SPACE_ID}/releases/${release_id}/stories`,
+        {
+          method: 'POST',
+          headers: getManagementHeaders(),
+          body: JSON.stringify({ story_id })
+        }
+      );
+
+      const data = await handleApiResponse(response);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      console.error("Error in add-story-to-release tool:", error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
+      };
+    }
+  }
+);
+
+server.tool(
+  "publish-release",
+  "Publishes a release",
+  {
+    release_id: z.string().describe("Release ID")
+  },
+  async ({ release_id }) => {
+    try {
+      if (!STORYBLOK_SPACE_ID) {
+        throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+      }
+
+      const response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${STORYBLOK_SPACE_ID}/releases/${release_id}/publish`,
+        {
+          method: 'POST',
+          headers: getManagementHeaders()
+        }
+      );
+
+      const data = await handleApiResponse(response);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      console.error("Error in publish-release tool:", error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
+      };
+    }
+  }
+);
+
+server.tool(
+  "delete-release",
+  "Deletes a release",
+  {
+    release_id: z.string().describe("Release ID")
+  },
+  async ({ release_id }) => {
+    try {
+      if (!STORYBLOK_SPACE_ID) {
+        throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+      }
+
+      const response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${STORYBLOK_SPACE_ID}/releases/${release_id}`,
+        {
+          method: 'DELETE',
+          headers: getManagementHeaders()
+        }
+      );
+
+      await handleApiResponse(response);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Release ${release_id} has been successfully deleted.`
+          }
+        ]
+      };
+    } catch (error) {
+      console.error("Error in delete-release tool:", error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
+      };
+    }
+  }
+);
+
 // TAGS MANAGEMENT TOOLS
 
 server.tool(
   "fetch-tags",
   "Fetches all tags from Storyblok space",
   {},
-  async ({}) => {
+  async ({ }) => {
     try {
       if (!STORYBLOK_SPACE_ID) {
         throw new Error('STORYBLOK_SPACE_ID environment variable is required');
@@ -721,13 +1086,339 @@ server.tool(
   }
 );
 
+// ASSET UPLOAD WORKFLOW TOOLS
+
+server.tool(
+  "init-asset-upload",
+  "Initializes asset upload and returns signed S3 upload URL",
+  {
+    filename: z.string().describe("Asset filename"),
+    size: z.number().describe("File size in bytes"),
+    content_type: z.string().describe("MIME type of the file")
+  },
+  async ({ filename, size, content_type }) => {
+    try {
+      if (!STORYBLOK_SPACE_ID) {
+        throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+      }
+
+      const response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${STORYBLOK_SPACE_ID}/assets`,
+        {
+          method: 'POST',
+          headers: getManagementHeaders(),
+          body: JSON.stringify({
+            filename,
+            size,
+            content_type
+          })
+        }
+      );
+
+      const data = await handleApiResponse(response);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      console.error("Error in init-asset-upload tool:", error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
+      };
+    }
+  }
+);
+
+server.tool(
+  "complete-asset-upload",
+  "Completes the asset upload process after S3 upload",
+  {
+    asset_id: z.string().describe("Asset ID from init-asset-upload response")
+  },
+  async ({ asset_id }) => {
+    try {
+      if (!STORYBLOK_SPACE_ID) {
+        throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+      }
+
+      const response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${STORYBLOK_SPACE_ID}/assets/${asset_id}/finish_upload`,
+        {
+          method: 'POST',
+          headers: getManagementHeaders()
+        }
+      );
+
+      const data = await handleApiResponse(response);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      console.error("Error in complete-asset-upload tool:", error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
+      };
+    }
+  }
+);
+
+// ASSET FOLDERS MANAGEMENT TOOLS
+
+server.tool(
+  "fetch-asset-folders",
+  "Fetches asset folders from Storyblok space",
+  {},
+  async ({ }) => {
+    try {
+      if (!STORYBLOK_SPACE_ID) {
+        throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+      }
+
+      const response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${STORYBLOK_SPACE_ID}/asset_folders`,
+        { headers: getManagementHeaders() }
+      );
+
+      const data = await handleApiResponse(response);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      console.error("Error in fetch-asset-folders tool:", error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
+      };
+    }
+  }
+);
+
+server.tool(
+  "create-asset-folder",
+  "Creates a new asset folder in Storyblok",
+  {
+    name: z.string().describe("Folder name"),
+    parent_id: z.number().optional().describe("Parent folder ID")
+  },
+  async ({ name, parent_id }) => {
+    try {
+      if (!STORYBLOK_SPACE_ID) {
+        throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+      }
+
+      const folderData: Record<string, unknown> = { name };
+      if (parent_id) folderData.parent_id = parent_id;
+
+      const response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${STORYBLOK_SPACE_ID}/asset_folders`,
+        {
+          method: 'POST',
+          headers: getManagementHeaders(),
+          body: JSON.stringify({ asset_folder: folderData })
+        }
+      );
+
+      const data = await handleApiResponse(response);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      console.error("Error in create-asset-folder tool:", error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
+      };
+    }
+  }
+);
+
+server.tool(
+  "update-asset-folder",
+  "Updates an existing asset folder in Storyblok",
+  {
+    id: z.string().describe("Asset folder ID"),
+    name: z.string().describe("New folder name")
+  },
+  async ({ id, name }) => {
+    try {
+      if (!STORYBLOK_SPACE_ID) {
+        throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+      }
+
+      const response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${STORYBLOK_SPACE_ID}/asset_folders/${id}`,
+        {
+          method: 'PUT',
+          headers: getManagementHeaders(),
+          body: JSON.stringify({ asset_folder: { name } })
+        }
+      );
+
+      const data = await handleApiResponse(response);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      console.error("Error in update-asset-folder tool:", error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
+      };
+    }
+  }
+);
+
+server.tool(
+  "delete-asset-folder",
+  "Deletes an asset folder from Storyblok",
+  {
+    id: z.string().describe("Asset folder ID")
+  },
+  async ({ id }) => {
+    try {
+      if (!STORYBLOK_SPACE_ID) {
+        throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+      }
+
+      const response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${STORYBLOK_SPACE_ID}/asset_folders/${id}`,
+        {
+          method: 'DELETE',
+          headers: getManagementHeaders()
+        }
+      );
+
+      await handleApiResponse(response);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Asset folder ${id} has been successfully deleted.`
+          }
+        ]
+      };
+    } catch (error) {
+      console.error("Error in delete-asset-folder tool:", error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
+      };
+    }
+  }
+);
+
+// DATASOURCES MANAGEMENT TOOLS
+
+server.tool(
+  "fetch-datasources",
+  "Fetches datasources from Storyblok space",
+  {
+    page: z.number().optional().describe("Page number for pagination (default: 1)"),
+    per_page: z.number().optional().describe("Number of datasources per page (default: 25, max: 100)")
+  },
+  async ({ page = 1, per_page = 25 }) => {
+    try {
+      if (!STORYBLOK_SPACE_ID) {
+        throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+      }
+
+      const params = new URLSearchParams({
+        page: page.toString(),
+        per_page: Math.min(per_page, 100).toString()
+      });
+
+      const response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${STORYBLOK_SPACE_ID}/datasources?${params}`,
+        { headers: getManagementHeaders() }
+      );
+
+      const data = await handleApiResponse(response);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      console.error("Error in fetch-datasources tool:", error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
+      };
+    }
+  }
+);
+
 // COMPONENTS/BLOCKS MANAGEMENT TOOLS
 
 server.tool(
   "fetch-components",
   "Fetches all components (blocks) from Storyblok space",
   {},
-  async ({}) => {
+  async ({ }) => {
     try {
       if (!STORYBLOK_SPACE_ID) {
         throw new Error('STORYBLOK_SPACE_ID environment variable is required');
@@ -1101,7 +1792,7 @@ server.tool(
   "get-space",
   "Gets information about the current Storyblok space",
   {},
-  async ({}) => {
+  async ({ }) => {
     try {
       if (!STORYBLOK_SPACE_ID) {
         throw new Error('STORYBLOK_SPACE_ID environment variable is required');
@@ -1140,7 +1831,7 @@ server.tool(
   "fetch-folders",
   "Fetches folders from Storyblok space",
   {},
-  async ({}) => {
+  async ({ }) => {
     try {
       if (!STORYBLOK_SPACE_ID) {
         throw new Error('STORYBLOK_SPACE_ID environment variable is required');
