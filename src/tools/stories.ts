@@ -38,13 +38,34 @@ export function registerStoryTools(server: McpServer) {
       try {
         // Helper function to access nested properties
         const getValueByPath = (obj: any, path: string): any => {
-          return path.split('.').reduce((acc, part) => {
-            // Handle array indexing like 'blocks.0.component'
-            if (acc && /^\d+$/.test(part) && Array.isArray(acc)) {
-              return acc[parseInt(part)];
+          if (obj === null || obj === undefined || typeof path !== 'string' || path === '') {
+            return undefined;
+          }
+          const parts = path.split('.');
+          let current = obj;
+
+          for (const part of parts) {
+            if (current === null || current === undefined) {
+              return undefined;
             }
-            return acc && acc[part];
-          }, obj);
+
+            const isArrayIndex = /^\d+$/.test(part);
+            if (isArrayIndex && Array.isArray(current)) {
+              const index = parseInt(part, 10);
+              if (index >= current.length || index < 0) { // Out of bounds (negative index check too)
+                return undefined;
+              }
+              current = current[index];
+            } else if (typeof current === 'object' && current !== null && Object.prototype.hasOwnProperty.call(current, part)) {
+              // Ensures 'part' is an own property of 'current' for objects
+              current = (current as any)[part];
+            } else {
+              // Path segment not found, or trying to access property on non-object (e.g. string, number)
+              // or part not an own property
+              return undefined;
+            }
+          }
+          return current;
         };
 
         const fetchStoriesForVersion = async (version?: "draft" | "published") => {
@@ -96,20 +117,20 @@ export function registerStoryTools(server: McpServer) {
               return String(value) === expectedValue;
             });
           });
-          responseMetadata.deep_filter_applied = true;
-          responseMetadata.stories_after_deep_filter = stories.length;
+          // responseMetadata.deep_filter_applied = true; // Removed
+          // responseMetadata.stories_after_deep_filter = stories.length; // Removed, stories_count in final response is sufficient
         }
 
         // Apply validate_schema
         if (params.validate_schema) {
           const componentNameToValidate = params.validate_schema;
+          responseMetadata.validated_schema_component_name = componentNameToValidate; // Renamed for clarity
           const componentSchema = await getComponentSchemaByName(componentNameToValidate);
-          responseMetadata.schema_validation_component = componentNameToValidate;
 
           if (!componentSchema) {
-            responseMetadata.schema_validation_error = `Component schema for '${componentNameToValidate}' not found.`;
+            responseMetadata.validation_schema_error = `Component schema for '${componentNameToValidate}' not found.`; // Renamed for consistency
           } else {
-            responseMetadata.schema_validation_applied = true;
+            // responseMetadata.schema_validation_applied = true; // Removed
             stories = stories.map((story: any) => {
               if (story.content?.component === componentNameToValidate) {
                 const validationResult: {
@@ -143,7 +164,16 @@ export function registerStoryTools(server: McpServer) {
           }
         }
 
-        const finalResponseData = { ...responseMetadata, stories_count: stories.length, stories: stories };
+        // Ensure responseMetadata is an object, even if empty, for consistent response structure.
+        if (Object.keys(responseMetadata).length === 0) {
+            // No specific metadata to add other than what's directly in finalResponseData
+            // To ensure consistency, one might choose to always include it:
+            // finalResponseData = { responseMetadata: {}, stories_count: stories.length, stories: stories };
+            // However, if it's truly empty, conditionally adding it or ensuring it's an empty object is fine.
+            // The current spread { ...responseMetadata } will just not add any keys if it's empty.
+        }
+
+        const finalResponseData = { responseMetadata: responseMetadata, stories_count: stories.length, stories: stories };
 
         return {
           content: [
@@ -677,7 +707,7 @@ server.tool(
       } else {
         return {
           isError: true,
-          content: [{ type: "text", text: "Error: Either story_id or story_content must be provided." }]
+          content: [{ type: "text", text: "Validation failed: Either 'story_id' (to fetch the story) or 'story_content' (to validate directly) must be provided." }]
         };
       }
 
