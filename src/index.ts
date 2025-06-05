@@ -1,3 +1,30 @@
+/**
+ * @file src/index.ts
+ * @description Main entry point for the MCP Storyblok Server.
+ * This file initializes the server, registers tools, and sets up global error handlers.
+ */
+
+/**
+ * Handles uncaught exceptions.
+ * Logs the error and exits the process.
+ * @param {Error} error - The uncaught exception.
+ */
+process.on('uncaughtException', (error: Error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+/**
+ * Handles unhandled promise rejections.
+ * Logs the error and exits the process.
+ * @param {any} reason - The reason for the rejection.
+ * @param {Promise<any>} promise - The promise that was rejected.
+ */
+process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { registerAllTools } from './tools/index.js';
@@ -23,7 +50,10 @@ import { registerAllTools } from './tools/index.js';
  * - Space-level operations
  */
 
-// Create the MCP server instance
+/**
+ * The primary MCP (Model Context Protocol) server instance.
+ * Configured with a name and version for identification.
+ */
 const server = new McpServer({
   name: "storyblok-server",
   version: "1.0.0",

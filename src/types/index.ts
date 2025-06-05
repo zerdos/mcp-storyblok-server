@@ -71,3 +71,20 @@ export interface SearchParams extends PaginationParams {
   resolve_links?: string;
   resolve_relations?: string;
 }
+
+/**
+ * Defines the standard structure for error responses from MCP tools.
+ * This ensures consistency in how errors are reported to the client.
+ */
+export interface McpToolErrorResponse {
+  /** Indicates that this is an error response. Always true for this type. */
+  isError: true;
+  /** A unique code identifying the type of error (e.g., "VALIDATION_ERROR", "API_ERROR"). */
+  errorCode: string;
+  /** A human-readable message summarizing the error. */
+  errorMessage: string;
+  /** Optional additional details about the error, can be a string or a structured object. */
+  errorDetails?: string | object;
+  /** Content to be displayed to the user, usually mirroring the error information. */
+  content: Array<{ type: "text"; text: string }>;
+}
