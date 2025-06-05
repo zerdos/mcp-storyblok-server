@@ -59,12 +59,13 @@ export function registerSearchTools(server: McpServer) {
           });
         }
 
+        const url = `${buildContentUrl('/stories')}?${params}`;
         const response = await fetch(
-          `${buildContentUrl('/stories')}?${params}`,
+          url,
           { headers: getContentHeaders() }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, url);
         return {
           content: [
             {
@@ -110,12 +111,13 @@ export function registerSearchTools(server: McpServer) {
           resolve_relations
         });
 
+        const url = `${buildContentUrl(`/stories/${slug}`)}?${params}`;
         const response = await fetch(
-          `${buildContentUrl(`/stories/${slug}`)}?${params}`,
+          url,
           { headers: getContentHeaders() }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, url);
         return {
           content: [
             {

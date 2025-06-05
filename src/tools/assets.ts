@@ -27,12 +27,13 @@ export function registerAssetTools(server: McpServer) {
           folder_id
         });
 
+        const endpoint = `${buildManagementUrl('/assets')}?${params}`;
         const response = await fetch(
-          `${buildManagementUrl('/assets')}?${params}`,
+          endpoint,
           { headers: getManagementHeaders() }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -65,12 +66,13 @@ export function registerAssetTools(server: McpServer) {
     },
     async ({ id }) => {
       try {
+        const endpoint = buildManagementUrl(`/assets/${id}`);
         const response = await fetch(
-          buildManagementUrl(`/assets/${id}`),
+          endpoint,
           { headers: getManagementHeaders() }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -103,15 +105,16 @@ export function registerAssetTools(server: McpServer) {
     },
     async ({ id }) => {
       try {
+        const endpoint = buildManagementUrl(`/assets/${id}`);
         const response = await fetch(
-          buildManagementUrl(`/assets/${id}`),
+          endpoint,
           {
             method: 'DELETE',
             headers: getManagementHeaders()
           }
         );
 
-        await handleApiResponse(response);
+        await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -146,8 +149,9 @@ export function registerAssetTools(server: McpServer) {
     },
     async ({ filename, size, content_type }) => {
       try {
+        const endpoint = buildManagementUrl('/assets');
         const response = await fetch(
-          buildManagementUrl('/assets'),
+          endpoint,
           {
             method: 'POST',
             headers: getManagementHeaders(),
@@ -159,7 +163,7 @@ export function registerAssetTools(server: McpServer) {
           }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -192,15 +196,16 @@ export function registerAssetTools(server: McpServer) {
     },
     async ({ asset_id }) => {
       try {
+        const endpoint = buildManagementUrl(`/assets/${asset_id}/finish_upload`);
         const response = await fetch(
-          buildManagementUrl(`/assets/${asset_id}/finish_upload`),
+          endpoint,
           {
             method: 'POST',
             headers: getManagementHeaders()
           }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -231,12 +236,13 @@ export function registerAssetTools(server: McpServer) {
     {},
     async () => {
       try {
+        const endpoint = buildManagementUrl('/asset_folders');
         const response = await fetch(
-          buildManagementUrl('/asset_folders'),
+          endpoint,
           { headers: getManagementHeaders() }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -273,8 +279,9 @@ export function registerAssetTools(server: McpServer) {
         const folderData: Record<string, unknown> = { name };
         if (parent_id) folderData.parent_id = parent_id;
 
+        const endpoint = buildManagementUrl('/asset_folders');
         const response = await fetch(
-          buildManagementUrl('/asset_folders'),
+          endpoint,
           {
             method: 'POST',
             headers: getManagementHeaders(),
@@ -282,7 +289,7 @@ export function registerAssetTools(server: McpServer) {
           }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -316,8 +323,9 @@ export function registerAssetTools(server: McpServer) {
     },
     async ({ id, name }) => {
       try {
+        const endpoint = buildManagementUrl(`/asset_folders/${id}`);
         const response = await fetch(
-          buildManagementUrl(`/asset_folders/${id}`),
+          endpoint,
           {
             method: 'PUT',
             headers: getManagementHeaders(),
@@ -325,7 +333,7 @@ export function registerAssetTools(server: McpServer) {
           }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -358,15 +366,16 @@ export function registerAssetTools(server: McpServer) {
     },
     async ({ id }) => {
       try {
+        const endpoint = buildManagementUrl(`/asset_folders/${id}`);
         const response = await fetch(
-          buildManagementUrl(`/asset_folders/${id}`),
+          endpoint,
           {
             method: 'DELETE',
             headers: getManagementHeaders()
           }
         );
 
-        await handleApiResponse(response);
+        await handleApiResponse(response, endpoint);
         return {
           content: [
             {

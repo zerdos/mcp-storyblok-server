@@ -21,12 +21,13 @@ export function registerReleaseTools(server: McpServer) {
       try {
         const params = createPaginationParams(page, per_page);
 
+        const endpoint = `${buildManagementUrl('/releases')}?${params}`;
         const response = await fetch(
-          `${buildManagementUrl('/releases')}?${params}`,
+          endpoint,
           { headers: getManagementHeaders() }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -63,8 +64,9 @@ export function registerReleaseTools(server: McpServer) {
         const releaseData: Record<string, unknown> = { name };
         if (publish_at) releaseData.publish_at = publish_at;
 
+        const endpoint = buildManagementUrl('/releases');
         const response = await fetch(
-          buildManagementUrl('/releases'),
+          endpoint,
           {
             method: 'POST',
             headers: getManagementHeaders(),
@@ -72,7 +74,7 @@ export function registerReleaseTools(server: McpServer) {
           }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -106,8 +108,9 @@ export function registerReleaseTools(server: McpServer) {
     },
     async ({ release_id, story_id }) => {
       try {
+        const endpoint = buildManagementUrl(`/releases/${release_id}/stories`);
         const response = await fetch(
-          buildManagementUrl(`/releases/${release_id}/stories`),
+          endpoint,
           {
             method: 'POST',
             headers: getManagementHeaders(),
@@ -115,7 +118,7 @@ export function registerReleaseTools(server: McpServer) {
           }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -148,15 +151,16 @@ export function registerReleaseTools(server: McpServer) {
     },
     async ({ release_id }) => {
       try {
+        const endpoint = buildManagementUrl(`/releases/${release_id}/publish`);
         const response = await fetch(
-          buildManagementUrl(`/releases/${release_id}/publish`),
+          endpoint,
           {
             method: 'POST',
             headers: getManagementHeaders()
           }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -189,15 +193,16 @@ export function registerReleaseTools(server: McpServer) {
     },
     async ({ release_id }) => {
       try {
+        const endpoint = buildManagementUrl(`/releases/${release_id}`);
         const response = await fetch(
-          buildManagementUrl(`/releases/${release_id}`),
+          endpoint,
           {
             method: 'DELETE',
             headers: getManagementHeaders()
           }
         );
 
-        await handleApiResponse(response);
+        await handleApiResponse(response, endpoint);
         return {
           content: [
             {

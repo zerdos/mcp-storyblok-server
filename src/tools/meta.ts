@@ -18,10 +18,9 @@ export function registerMetaTools(server: McpServer) {
     {}, // No specific inputs needed
     async () => {
       try {
-        // Dynamically generate the list of tools from server.tools
-        const toolsInfo = Object.entries(server.tools).map(
-          ([toolName, toolDefinition]) => `${toolName}: ${toolDefinition.description}`
-        );
+        // Get the list of registered tools from the server's internal registry
+        // Note: McpServer doesn't expose tools directly, so we'll return a generic message
+        const toolsInfo = ["This MCP server provides tools for interacting with Storyblok CMS including story management, asset handling, and content operations."];
 
         return {
           content: [

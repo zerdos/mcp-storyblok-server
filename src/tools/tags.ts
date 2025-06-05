@@ -14,12 +14,13 @@ export function registerTagTools(server: McpServer) {
     {},
     async () => {
       try {
+        const endpoint = buildManagementUrl('/tags');
         const response = await fetch(
-          buildManagementUrl('/tags'),
+          endpoint,
           { headers: getManagementHeaders() }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -52,8 +53,9 @@ export function registerTagTools(server: McpServer) {
     },
     async ({ name }) => {
       try {
+        const endpoint = buildManagementUrl('/tags');
         const response = await fetch(
-          buildManagementUrl('/tags'),
+          endpoint,
           {
             method: 'POST',
             headers: getManagementHeaders(),
@@ -61,7 +63,7 @@ export function registerTagTools(server: McpServer) {
           }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -95,8 +97,9 @@ export function registerTagTools(server: McpServer) {
     },
     async ({ name, story_id }) => {
       try {
+        const endpoint = buildManagementUrl('/tags');
         const response = await fetch(
-          buildManagementUrl('/tags'),
+          endpoint,
           {
             method: 'POST',
             headers: getManagementHeaders(),
@@ -104,7 +107,7 @@ export function registerTagTools(server: McpServer) {
           }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -137,15 +140,16 @@ export function registerTagTools(server: McpServer) {
     },
     async ({ id }) => {
       try {
+        const endpoint = buildManagementUrl(`/tags/${id}`);
         const response = await fetch(
-          buildManagementUrl(`/tags/${id}`),
+          endpoint,
           {
             method: 'DELETE',
             headers: getManagementHeaders()
           }
         );
 
-        await handleApiResponse(response);
+        await handleApiResponse(response, endpoint);
         return {
           content: [
             {

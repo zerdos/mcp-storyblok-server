@@ -117,8 +117,6 @@ export function registerStoryTools(server: McpServer) {
               return String(value) === expectedValue;
             });
           });
-          // responseMetadata.deep_filter_applied = true; // Removed
-          // responseMetadata.stories_after_deep_filter = stories.length; // Removed, stories_count in final response is sufficient
         }
 
         // Apply validate_schema
@@ -130,7 +128,6 @@ export function registerStoryTools(server: McpServer) {
           if (!componentSchema) {
             responseMetadata.validation_schema_error = `Component schema for '${componentNameToValidate}' not found.`; // Renamed for consistency
           } else {
-            // responseMetadata.schema_validation_applied = true; // Removed
             stories = stories.map((story: any) => {
               if (story.content?.component === componentNameToValidate) {
                 const validationResult: {
@@ -162,15 +159,6 @@ export function registerStoryTools(server: McpServer) {
               return story; // No validation object if component doesn't match
             });
           }
-        }
-
-        // Ensure responseMetadata is an object, even if empty, for consistent response structure.
-        if (Object.keys(responseMetadata).length === 0) {
-            // No specific metadata to add other than what's directly in finalResponseData
-            // To ensure consistency, one might choose to always include it:
-            // finalResponseData = { responseMetadata: {}, stories_count: stories.length, stories: stories };
-            // However, if it's truly empty, conditionally adding it or ensuring it's an empty object is fine.
-            // The current spread { ...responseMetadata } will just not add any keys if it's empty.
         }
 
         const finalResponseData = { responseMetadata: responseMetadata, stories_count: stories.length, stories: stories };
@@ -657,507 +645,501 @@ export function registerStoryTools(server: McpServer) {
       }
     }
   );
-}
 
-// New Tool: validate-story-content
-server.tool(
-  "validate-story-content",
-  "Validates a story's content against a component schema",
-  {
-    story_id: z.string().optional().describe("Story ID (optional if content is provided directly)."),
-    component_name: z.string().describe("The name of the component schema to validate against."),
-    story_content: z.record(z.unknown()).optional().describe("Story content object to validate (fetched if not provided and story_id is)."),
-    space_id: z.string().optional().describe("Space ID, defaults to configured space. (Currently uses default space)")
-  },
-  async ({ story_id, component_name, story_content, space_id }) => {
-    const errors: Array<{ field: string; type: "missing_required" | "extraneous_field" | "type_mismatch" | "general"; message: string }> = [];
-    const missingFields: string[] = [];
-    const extraneousFields: string[] = [];
-    let isValid = true;
+  // New Tool: validate-story-content
+  server.tool(
+    "validate-story-content",
+    "Validates a story's content against a component schema",
+    {
+      story_id: z.string().optional().describe("Story ID (optional if content is provided directly)."),
+      component_name: z.string().describe("The name of the component schema to validate against."),
+      story_content: z.record(z.unknown()).optional().describe("Story content object to validate (fetched if not provided and story_id is)."),
+      space_id: z.string().optional().describe("Space ID, defaults to configured space. (Currently uses default space)")
+    },
+    async ({ story_id, component_name, story_content, space_id }: {
+      story_id?: string;
+      component_name: string;
+      story_content?: Record<string, unknown>;
+      space_id?: string;
+    }) => {
+      const errors: Array<{ field: string; type: "missing_required" | "extraneous_field" | "type_mismatch" | "general"; message: string }> = [];
+      const missingFields: string[] = [];
+      const extraneousFields: string[] = [];
+      let isValid = true;
 
-    try {
-      // 1. Fetch Component Schema
-      // Note: The space_id from input isn't fully utilized yet by getComponentSchemaByName as it defaults to primary config.
-      const componentSchema = await getComponentSchemaByName(component_name, space_id);
-      if (!componentSchema) {
-        return {
-          isError: true,
-          content: [{ type: "text", text: `Error: Component schema for '${component_name}' not found.` }]
-        };
-      }
+      try {
+        // 1. Fetch Component Schema
+        // Note: The space_id from input isn't fully utilized yet by getComponentSchemaByName as it defaults to primary config.
+        const componentSchema = await getComponentSchemaByName(component_name, space_id);
+        if (!componentSchema) {
+          return {
+            isError: true,
+            content: [{ type: "text", text: `Error: Component schema for '${component_name}' not found.` }]
+          };
+        }
 
-      // 2. Fetch Story Content (if needed)
-      let actualStoryContent: Record<string, any> | null = null;
-      if (story_content) {
-        actualStoryContent = story_content;
-      } else if (story_id) {
-        const storyEndpointPath = `/stories/${story_id}`;
-        const storyFullUrl = buildManagementUrl(storyEndpointPath);
-        const storyResponse = await fetch(storyFullUrl, { headers: getManagementHeaders() });
-        const storyData = await handleApiResponse(storyResponse, storyFullUrl);
-        // Assuming storyData is { story: { content: { ... } } }
-        if (storyData && storyData.story && storyData.story.content) {
-          actualStoryContent = storyData.story.content;
+        // 2. Fetch Story Content (if needed)
+        let actualStoryContent: Record<string, any> | null = null;
+        if (story_content) {
+          actualStoryContent = story_content;
+        } else if (story_id) {
+          const storyEndpointPath = `/stories/${story_id}`;
+          const storyFullUrl = buildManagementUrl(storyEndpointPath);
+          const storyResponse = await fetch(storyFullUrl, { headers: getManagementHeaders() });
+          const storyData = await handleApiResponse(storyResponse, storyFullUrl);
+          // Assuming storyData is { story: { content: { ... } } }
+          if (storyData && storyData.story && storyData.story.content) {
+            actualStoryContent = storyData.story.content;
+          } else {
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Error: Could not fetch content for story_id '${story_id}'. Or content is not in expected format.` }]
+            };
+          }
         } else {
           return {
             isError: true,
-            content: [{ type: "text", text: `Error: Could not fetch content for story_id '${story_id}'. Or content is not in expected format.` }]
+            content: [{ type: "text", text: "Validation failed: Either 'story_id' (to fetch the story) or 'story_content' (to validate directly) must be provided." }]
           };
         }
-      } else {
+
+        if (!actualStoryContent) { // Should be caught above, but as a safeguard
+           return { isError: true, content: [{ type: "text", text: "Error: Failed to obtain story content." }] };
+        }
+
+        // 3. Validate Content
+        // Storyblok component schemas have a 'schema' object where keys are field names.
+        // Each field definition can have a 'required: true' property.
+        const schemaFields = componentSchema; // componentSchema is the schema object itself
+
+        // Check for missing required fields
+        for (const fieldName in schemaFields) {
+          const fieldDef = schemaFields[fieldName] as any;
+          if (fieldDef.required && actualStoryContent[fieldName] === undefined) {
+            missingFields.push(fieldName);
+            errors.push({
+              field: fieldName,
+              type: "missing_required",
+              message: `Field '${fieldName}' is required but missing.`
+            });
+          }
+        }
+
+        // Check for extraneous fields in the content
+        for (const contentFieldName in actualStoryContent) {
+          if (!schemaFields.hasOwnProperty(contentFieldName)) {
+            extraneousFields.push(contentFieldName);
+            errors.push({
+              field: contentFieldName,
+              type: "extraneous_field",
+              message: `Field '${contentFieldName}' is present in content but not defined in component schema.`
+            });
+          }
+        }
+
+        isValid = errors.length === 0;
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                isValid,
+                errors,
+                missingFields,
+                extraneousFields,
+                validatedComponentName: component_name,
+                storyIdProcessed: story_id || "N/A (content provided directly)"
+              }, null, 2)
+            }
+          ]
+        };
+
+      } catch (error) {
+        console.error("Error in validate-story-content tool:", error);
         return {
           isError: true,
-          content: [{ type: "text", text: "Validation failed: Either 'story_id' (to fetch the story) or 'story_content' (to validate directly) must be provided." }]
+          content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }]
         };
       }
+    }
+  );
 
-      if (!actualStoryContent) { // Should be caught above, but as a safeguard
-         return { isError: true, content: [{ type: "text", text: "Error: Failed to obtain story content." }] };
+  // Tool: debug-story-access
+  server.tool(
+    "debug-story-access",
+    "Debugs access to a specific story by trying various fetch parameters.",
+    {
+      story_id: z.string().describe("The ID of the story to debug.")
+    },
+    async ({ story_id }: { story_id: string }) => {
+      const apiCallAttempts: any[] = [];
+      const issuesDetected: string[] = [];
+      const suggestions: string[] = [];
+
+      let accessibleAsDraftDetails = { accessible: false, contentPresent: false, fromScenario: "" };
+      let accessibleAsPublishedDetails = { accessible: false, contentPresent: false, fromScenario: "" };
+
+      const scenarios = [
+        { name: "Default (likely draft)", params: {} },
+        { name: "Published", params: { version: "published" } },
+        { name: "Draft explicit", params: { version: "draft" } },
+        { name: "Draft with content", params: { version: "draft", with_content: "1" } },
+        { name: "Published with content", params: { version: "published", with_content: "1" } },
+      ];
+
+      for (const scenario of scenarios) {
+        const attemptResult: any = { scenarioName: scenario.name, paramsUsed: { ...scenario.params, story_id } };
+        try {
+          const urlParams = new URLSearchParams();
+          if ((scenario.params as any).version) urlParams.append("version", (scenario.params as any).version);
+          if ((scenario.params as any).with_content) urlParams.append("with_content", (scenario.params as any).with_content);
+
+          const endpointPath = `/stories/${story_id}`;
+          const queryString = urlParams.toString();
+          const fullUrl = buildManagementUrl(endpointPath) + (queryString ? `?${queryString}` : "");
+
+          attemptResult.requestUrl = fullUrl;
+
+          const response = await fetch(fullUrl, { headers: getManagementHeaders() });
+          const data = await handleApiResponse(response, fullUrl); // handleApiResponse throws on !response.ok
+
+          attemptResult.status = response.status;
+          attemptResult.responseData = {
+            id: data?.story?.id,
+            name: data?.story?.name,
+            published_at: data?.story?.published_at,
+            full_slug: data?.story?.full_slug,
+            content_present: !!data?.story?.content,
+            content_component: data?.story?.content?.component,
+            version: data?.story?.version, // if API returns it
+          };
+
+          const story = data?.story;
+          const contentPresent = !!story?.content;
+
+          if ((scenario.params as any).version === "published") {
+            if (story) {
+              if (!accessibleAsPublishedDetails.accessible || (contentPresent && !accessibleAsPublishedDetails.contentPresent)) {
+                  accessibleAsPublishedDetails = { accessible: true, contentPresent: contentPresent, fromScenario: scenario.name };
+              }
+              if (!story.published_at) {
+                issuesDetected.push(`Scenario '${scenario.name}': Story fetched as published, but 'published_at' is null/missing.`);
+              }
+            }
+          } else { // Draft or default
+            if (story) {
+               if (!accessibleAsDraftDetails.accessible || (contentPresent && !accessibleAsDraftDetails.contentPresent)) {
+                  accessibleAsDraftDetails = { accessible: true, contentPresent: contentPresent, fromScenario: scenario.name };
+              }
+            }
+          }
+          if ((scenario.params as any).with_content && !contentPresent && story) {
+              issuesDetected.push(`Scenario '${scenario.name}': Requested 'with_content' but content is missing.`);
+          }
+
+        } catch (error) {
+          attemptResult.status = "ERROR"; // Placeholder, real status is in parsedError.error
+          if (error instanceof Error && error.message.startsWith('{')) {
+            try {
+              const parsedError = JSON.parse(error.message);
+              attemptResult.errorDetails = parsedError;
+              if (parsedError.error) { // From our enhanced handler
+                   const statusMatch = parsedError.error.match(/^(\d{3})/);
+                   if (statusMatch) attemptResult.status = parseInt(statusMatch[1]);
+              }
+            } catch (parseErr) {
+              attemptResult.errorDetails = error.message;
+            }
+          } else {
+            attemptResult.errorDetails = error instanceof Error ? error.message : String(error);
+          }
+        }
+        apiCallAttempts.push(attemptResult);
       }
 
-      // 3. Validate Content
-      // Storyblok component schemas have a 'schema' object where keys are field names.
-      // Each field definition can have a 'required: true' property.
-      const schemaFields = componentSchema; // componentSchema is the schema object itself
-
-      // Check for missing required fields
-      for (const fieldName in schemaFields) {
-        const fieldDef = schemaFields[fieldName] as any;
-        if (fieldDef.required && actualStoryContent[fieldName] === undefined) {
-          missingFields.push(fieldName);
-          errors.push({
-            field: fieldName,
-            type: "missing_required",
-            message: `Field '${fieldName}' is required but missing.`
-          });
+      // Overall Analysis
+      if (accessibleAsDraftDetails.accessible && !accessibleAsPublishedDetails.accessible) {
+        suggestions.push("Story is accessible in 'draft' version but not 'published'. It might be unpublished or never published.");
+        if (!accessibleAsDraftDetails.contentPresent && accessibleAsPublishedDetails.fromScenario.includes("with content")){
+           suggestions.push("Draft version was accessible but content might be missing. Ensure 'with_content=1' (or equivalent) is used if full content is needed for drafts.");
         }
       }
-
-      // Check for extraneous fields in the content
-      for (const contentFieldName in actualStoryContent) {
-        if (!schemaFields.hasOwnProperty(contentFieldName)) {
-          extraneousFields.push(contentFieldName);
-          errors.push({
-            field: contentFieldName,
-            type: "extraneous_field",
-            message: `Field '${contentFieldName}' is present in content but not defined in component schema.`
-          });
-        }
-        // Basic type checking (optional, can be expanded)
-        // else if (schemaFields[contentFieldName] && (schemaFields[contentFieldName]as any).type) {
-        //   const expectedType = (schemaFields[contentFieldName]as any).type;
-        //   const actualType = typeof actualStoryContent[contentFieldName];
-        //   // This is a very basic type check, Storyblok types are more complex
-        //   if (expectedType === 'number' && actualType !== 'number') {
-        //      errors.push({ field: contentFieldName, type: "type_mismatch", message: `Type mismatch for ${contentFieldName}`});
-        //   } // etc. for other types
-        // }
+      if (!accessibleAsDraftDetails.accessible && accessibleAsPublishedDetails.accessible) {
+        issuesDetected.push("Story is accessible as 'published' but not as 'draft'. This is unusual but could happen if there's a very specific server-side state or error with the draft version.");
+      }
+      if (accessibleAsDraftDetails.accessible && accessibleAsPublishedDetails.accessible) {
+          if(accessibleAsDraftDetails.contentPresent && !accessibleAsPublishedDetails.contentPresent && accessibleAsPublishedDetails.fromScenario && !accessibleAsPublishedDetails.fromScenario.includes("with content")){
+              suggestions.push("Published version content was not fetched. If needed, try fetching published version with 'with_content=1'.");
+          }
+          if(!accessibleAsDraftDetails.contentPresent && accessibleAsPublishedDetails.contentPresent && accessibleAsDraftDetails.fromScenario && !accessibleAsDraftDetails.fromScenario.includes("with content")){
+              suggestions.push("Draft version content was not fetched. If needed, try fetching draft version with 'with_content=1'.");
+          }
+      }
+      if (!accessibleAsDraftDetails.accessible && !accessibleAsPublishedDetails.accessible) {
+        issuesDetected.push("Story was not accessible with any of the attempted common parameters (draft, published, with/without content).");
+        suggestions.push("Verify the story ID is correct and exists in the space. Check token permissions if 403 errors occurred.");
       }
 
-      isValid = errors.length === 0;
+      // Check for consistent 404s
+      const all404 = apiCallAttempts.every(att => att.status === 404);
+      if(all404){
+          issuesDetected.push("All attempts resulted in a 404 Not Found error.");
+          suggestions.push("Confirm the story ID is correct and the story has not been deleted.");
+      }
+
+      // Check for permission issues
+      const any403 = apiCallAttempts.some(att => att.status === 403);
+      if(any403){
+          issuesDetected.push("At least one attempt resulted in a 403 Forbidden error.");
+          suggestions.push("Check the API token's permissions for reading stories. It might lack access to certain story states (e.g., drafts vs published) or the stories endpoint in general.");
+      }
 
       return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              isValid,
-              errors,
-              missingFields,
-              extraneousFields,
-              validatedComponentName: component_name,
-              storyIdProcessed: story_id || "N/A (content provided directly)"
-            }, null, 2)
-          }
-        ]
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            storyId: story_id,
+            accessibleAsDraftDetails,
+            accessibleAsPublishedDetails,
+            issuesDetected: [...new Set(issuesDetected)], // Deduplicate
+            suggestions: [...new Set(suggestions)], // Deduplicate
+            apiCallAttempts
+          }, null, 2)
+        }]
       };
+    }
+  );
 
-    } catch (error) {
-      console.error("Error in validate-story-content tool:", error);
+  // Tool: bulk-publish-stories
+  server.tool(
+    "bulk-publish-stories",
+    "Publishes multiple stories in Storyblok",
+    {
+      story_ids: z.array(z.string()).min(1).describe("Array of Story IDs to publish.")
+    },
+    async ({ story_ids }: { story_ids: string[] }) => {
+      const results: Array<{ id: string, status: "success" | "error", data?: any, error?: string }> = [];
+      let successful_operations = 0;
+      let failed_operations = 0;
+
+      for (const id of story_ids) {
+        try {
+          const endpointPath = `/stories/${id}/publish`;
+          const fullUrl = buildManagementUrl(endpointPath);
+
+          const response = await fetch(fullUrl, {
+            method: 'POST', // Publish is a POST request
+            headers: getManagementHeaders(),
+          });
+
+          const data = await handleApiResponse(response, fullUrl); // Publish endpoint returns the published story object
+          results.push({ id, status: "success", data });
+          successful_operations++;
+        } catch (error) {
+          results.push({ id, status: "error", error: error instanceof Error ? error.message : String(error) });
+          failed_operations++;
+        }
+      }
+
       return {
-        isError: true,
-        content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }]
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            total_processed: story_ids.length,
+            successful_operations,
+            failed_operations,
+            results
+          }, null, 2)
+        }]
       };
     }
-  }
-);
+  );
 
-// Tool: debug-story-access
-server.tool(
-  "debug-story-access",
-  "Debugs access to a specific story by trying various fetch parameters.",
-  {
-    story_id: z.string().describe("The ID of the story to debug.")
-  },
-  async ({ story_id }) => {
-    const apiCallAttempts: any[] = [];
-    const issuesDetected: string[] = [];
-    const suggestions: string[] = [];
+  // Tool: bulk-delete-stories
+  server.tool(
+    "bulk-delete-stories",
+    "Deletes multiple stories in Storyblok",
+    {
+      story_ids: z.array(z.string()).min(1).describe("Array of Story IDs to delete.")
+    },
+    async ({ story_ids }: { story_ids: string[] }) => {
+      const results: Array<{ id: string, status: "success" | "error", error?: string }> = [];
+      let successful_operations = 0;
+      let failed_operations = 0;
 
-    let accessibleAsDraftDetails = { accessible: false, contentPresent: false, fromScenario: "" };
-    let accessibleAsPublishedDetails = { accessible: false, contentPresent: false, fromScenario: "" };
+      for (const id of story_ids) {
+        try {
+          const endpointPath = `/stories/${id}`;
+          const fullUrl = buildManagementUrl(endpointPath);
 
-    const scenarios = [
-      { name: "Default (likely draft)", params: {} },
-      { name: "Published", params: { version: "published" } },
-      { name: "Draft explicit", params: { version: "draft" } },
-      { name: "Draft with content", params: { version: "draft", with_content: "1" } },
-      { name: "Published with content", params: { version: "published", with_content: "1" } },
-    ];
+          const response = await fetch(fullUrl, {
+            method: 'DELETE',
+            headers: getManagementHeaders(),
+          });
 
-    for (const scenario of scenarios) {
-      const attemptResult: any = { scenarioName: scenario.name, paramsUsed: { ...scenario.params, story_id } };
-      try {
-        const urlParams = new URLSearchParams();
-        if (scenario.params.version) urlParams.append("version", scenario.params.version);
-        if (scenario.params.with_content) urlParams.append("with_content", scenario.params.with_content); // Placeholder
+          await handleApiResponse(response, fullUrl); // delete doesn't typically return content, but handleApiResponse checks response.ok
+          results.push({ id, status: "success" });
+          successful_operations++;
+        } catch (error) {
+          results.push({ id, status: "error", error: error instanceof Error ? error.message : String(error) });
+          failed_operations++;
+        }
+      }
 
-        const endpointPath = `/stories/${story_id}`;
-        const queryString = urlParams.toString();
-        const fullUrl = buildManagementUrl(endpointPath) + (queryString ? `?${queryString}` : "");
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            total_processed: story_ids.length,
+            successful_operations,
+            failed_operations,
+            results
+          }, null, 2)
+        }]
+      };
+    }
+  );
 
-        attemptResult.requestUrl = fullUrl;
+  // Tool: bulk-update-stories
+  server.tool(
+    "bulk-update-stories",
+    "Updates multiple stories in Storyblok",
+    {
+      stories: z.array(
+        z.object({
+          id: z.string().describe("Story ID"),
+          name: z.string().optional().describe("Story name"),
+          slug: z.string().optional().describe("Story slug"),
+          content: z.record(z.unknown()).optional().describe("Story content object"),
+          parent_id: z.number().optional().describe("Parent folder ID (cannot be used to move to root, use 0 or null for root)"),
+          is_folder: z.boolean().optional().describe("Whether this is a folder"),
+          is_startpage: z.boolean().optional().describe("Whether this is the startpage"),
+          tag_list: z.array(z.string()).optional().describe("Array of tag names"),
+          publish: z.boolean().optional().default(false).describe("Whether to publish the story after updating")
+        })
+      ).min(1).describe("Array of story objects to update. Each object must have an 'id'.")
+    },
+    async ({ stories }: { stories: Array<any> }) => {
+      const results: Array<{ id: string, status: "success" | "error", data?: any, error?: string, published?: boolean }> = [];
+      let successful_operations = 0;
+      let failed_operations = 0;
 
-        const response = await fetch(fullUrl, { headers: getManagementHeaders() });
-        const data = await handleApiResponse(response, fullUrl); // handleApiResponse throws on !response.ok
-
-        attemptResult.status = response.status;
-        attemptResult.responseData = {
-          id: data?.story?.id,
-          name: data?.story?.name,
-          published_at: data?.story?.published_at,
-          full_slug: data?.story?.full_slug,
-          content_present: !!data?.story?.content,
-          content_component: data?.story?.content?.component,
-          version: data?.story?.version, // if API returns it
-        };
-
-        const story = data?.story;
-        const contentPresent = !!story?.content;
-
-        if (scenario.params.version === "published") {
-          if (story) {
-            if (!accessibleAsPublishedDetails.accessible || (contentPresent && !accessibleAsPublishedDetails.contentPresent)) {
-                accessibleAsPublishedDetails = { accessible: true, contentPresent: contentPresent, fromScenario: scenario.name };
+      for (const storyUpdate of stories) {
+        const { id, publish, ...updateFields } = storyUpdate;
+        try {
+          const storyPayload: Record<string, unknown> = {};
+          // Filter out undefined values explicitly, as Storyblok API might interpret them
+          Object.keys(updateFields).forEach(key => {
+            if ((updateFields as any)[key] !== undefined) {
+              storyPayload[key] = (updateFields as any)[key];
             }
-            if (!story.published_at) {
-              issuesDetected.push(`Scenario '${scenario.name}': Story fetched as published, but 'published_at' is null/missing.`);
+          });
+
+          const endpointPath = `/stories/${id}`;
+          const fullUrl = buildManagementUrl(endpointPath);
+
+          const response = await fetch(fullUrl, {
+            method: 'PUT',
+            headers: getManagementHeaders(),
+            body: JSON.stringify({ story: storyPayload }), // Storyblok expects { story: { ... } }
+          });
+
+          const data = await handleApiResponse(response, fullUrl);
+          let published = false;
+
+          if (publish) {
+            try {
+              const publishEndpointPath = `/stories/${id}/publish`;
+              const publishFullUrl = buildManagementUrl(publishEndpointPath);
+              const publishResponse = await fetch(publishFullUrl, {
+                method: 'POST',
+                headers: getManagementHeaders(),
+              });
+              await handleApiResponse(publishResponse, publishFullUrl);
+              published = true;
+            } catch (publishError) {
+              // Log publish error but don't fail the update operation itself
+              console.error(`Failed to publish story ${id}:`, publishError);
+              // Optionally add this info to the result for this story
             }
           }
-        } else { // Draft or default
-          if (story) {
-             if (!accessibleAsDraftDetails.accessible || (contentPresent && !accessibleAsDraftDetails.contentPresent)) {
-                accessibleAsDraftDetails = { accessible: true, contentPresent: contentPresent, fromScenario: scenario.name };
-            }
-          }
-        }
-        if (scenario.params.with_content && !contentPresent && story) {
-            issuesDetected.push(`Scenario '${scenario.name}': Requested 'with_content' but content is missing.`);
-        }
-
-
-      } catch (error) {
-        attemptResult.status = "ERROR"; // Placeholder, real status is in parsedError.error
-        if (error instanceof Error && error.message.startsWith('{')) {
-          try {
-            const parsedError = JSON.parse(error.message);
-            attemptResult.errorDetails = parsedError;
-            if (parsedError.error) { // From our enhanced handler
-                 const statusMatch = parsedError.error.match(/^(\d{3})/);
-                 if (statusMatch) attemptResult.status = parseInt(statusMatch[1]);
-            }
-          } catch (parseErr) {
-            attemptResult.errorDetails = error.message;
-          }
-        } else {
-          attemptResult.errorDetails = error instanceof Error ? error.message : String(error);
+          results.push({ id, status: "success", data, published });
+          successful_operations++;
+        } catch (error) {
+          results.push({ id, status: "error", error: error instanceof Error ? error.message : String(error) });
+          failed_operations++;
         }
       }
-      apiCallAttempts.push(attemptResult);
-    }
 
-    // Overall Analysis
-    if (accessibleAsDraftDetails.accessible && !accessibleAsPublishedDetails.accessible) {
-      suggestions.push("Story is accessible in 'draft' version but not 'published'. It might be unpublished or never published.");
-      if (!accessibleAsDraftDetails.contentPresent && accessibleAsPublishedDetails.fromScenario.includes("with content")){
-         suggestions.push("Draft version was accessible but content might be missing. Ensure 'with_content=1' (or equivalent) is used if full content is needed for drafts.");
-      }
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            total_processed: stories.length,
+            successful_operations,
+            failed_operations,
+            results
+          }, null, 2)
+        }]
+      };
     }
-    if (!accessibleAsDraftDetails.accessible && accessibleAsPublishedDetails.accessible) {
-      issuesDetected.push("Story is accessible as 'published' but not as 'draft'. This is unusual but could happen if there's a very specific server-side state or error with the draft version.");
-    }
-    if (accessibleAsDraftDetails.accessible && accessibleAsPublishedDetails.accessible) {
-        if(accessibleAsDraftDetails.contentPresent && !accessibleAsPublishedDetails.contentPresent && accessibleAsPublishedDetails.fromScenario && !accessibleAsPublishedDetails.fromScenario.includes("with content")){
-            suggestions.push("Published version content was not fetched. If needed, try fetching published version with 'with_content=1'.");
+  );
+
+  // Tool: bulk-create-stories
+  server.tool(
+    "bulk-create-stories",
+    "Creates multiple stories in Storyblok",
+    {
+      stories: z.array(
+        z.object({
+          name: z.string().describe("Story name"),
+          slug: z.string().describe("Story slug (URL path)"),
+          content: z.record(z.unknown()).describe("Story content object"),
+          parent_id: z.number().optional().describe("Parent folder ID"),
+          is_folder: z.boolean().optional().default(false).describe("Whether this is a folder"),
+          is_startpage: z.boolean().optional().default(false).describe("Whether this is the startpage"),
+          tag_list: z.array(z.string()).optional().describe("Array of tag names")
+        })
+      ).min(1).describe("Array of story objects to create")
+    },
+    async ({ stories }: { stories: Array<any> }) => {
+      const results: Array<{ input: any, id?: number, slug?: string, status: "success" | "error", data?: any, error?: string }> = [];
+      let successful_operations = 0;
+      let failed_operations = 0;
+
+      for (const storyInput of stories) {
+        try {
+          const storyPayload = { story: storyInput };
+          const endpointPath = '/stories';
+          const fullUrl = buildManagementUrl(endpointPath);
+
+          const response = await fetch(fullUrl, {
+            method: 'POST',
+            headers: getManagementHeaders(),
+            body: JSON.stringify(storyPayload),
+          });
+
+          const data = await handleApiResponse(response, fullUrl); // data.story contains the created story
+          results.push({ input: storyInput, id: data?.story?.id, slug: data?.story?.slug, status: "success", data });
+          successful_operations++;
+        } catch (error) {
+          results.push({ input: storyInput, slug: storyInput.slug, status: "error", error: error instanceof Error ? error.message : String(error) });
+          failed_operations++;
         }
-        if(!accessibleAsDraftDetails.contentPresent && accessibleAsPublishedDetails.contentPresent && accessibleAsDraftDetails.fromScenario && !accessibleAsDraftDetails.fromScenario.includes("with content")){
-            suggestions.push("Draft version content was not fetched. If needed, try fetching draft version with 'with_content=1'.");
-        }
-    }
-    if (!accessibleAsDraftDetails.accessible && !accessibleAsPublishedDetails.accessible) {
-      issuesDetected.push("Story was not accessible with any of the attempted common parameters (draft, published, with/without content).");
-      suggestions.push("Verify the story ID is correct and exists in the space. Check token permissions if 403 errors occurred.");
-    }
-
-    // Check for consistent 404s
-    const all404 = apiCallAttempts.every(att => att.status === 404);
-    if(all404){
-        issuesDetected.push("All attempts resulted in a 404 Not Found error.");
-        suggestions.push("Confirm the story ID is correct and the story has not been deleted.");
-    }
-
-    // Check for permission issues
-    const any403 = apiCallAttempts.some(att => att.status === 403);
-    if(any403){
-        issuesDetected.push("At least one attempt resulted in a 403 Forbidden error.");
-        suggestions.push("Check the API token's permissions for reading stories. It might lack access to certain story states (e.g., drafts vs published) or the stories endpoint in general.");
-    }
-
-
-    return {
-      content: [{
-        type: "text",
-        text: JSON.stringify({
-          storyId: story_id,
-          accessibleAsDraftDetails,
-          accessibleAsPublishedDetails,
-          issuesDetected: [...new Set(issuesDetected)], // Deduplicate
-          suggestions: [...new Set(suggestions)], // Deduplicate
-          apiCallAttempts
-        }, null, 2)
-      }]
-    };
-  }
-);
-
-// Tool: bulk-publish-stories
-server.tool(
-  "bulk-publish-stories",
-  "Publishes multiple stories in Storyblok",
-  {
-    story_ids: z.array(z.string()).min(1).describe("Array of Story IDs to publish.")
-  },
-  async ({ story_ids }) => {
-    const results: Array<{ id: string, status: "success" | "error", data?: any, error?: string }> = [];
-    let successful_operations = 0;
-    let failed_operations = 0;
-
-    for (const id of story_ids) {
-      try {
-        const endpointPath = `/stories/${id}/publish`;
-        const fullUrl = buildManagementUrl(endpointPath);
-
-        const response = await fetch(fullUrl, {
-          method: 'POST', // Publish is a POST request
-          headers: getManagementHeaders(),
-        });
-
-        const data = await handleApiResponse(response, fullUrl); // Publish endpoint returns the published story object
-        results.push({ id, status: "success", data });
-        successful_operations++;
-      } catch (error) {
-        results.push({ id, status: "error", error: error instanceof Error ? error.message : String(error) });
-        failed_operations++;
       }
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            total_processed: stories.length,
+            successful_operations,
+            failed_operations,
+            results
+          }, null, 2)
+        }]
+      };
     }
-
-    return {
-      content: [{
-        type: "text",
-        text: JSON.stringify({
-          total_processed: story_ids.length,
-          successful_operations,
-          failed_operations,
-          results
-        }, null, 2)
-      }]
-    };
-  }
-);
-
-// Tool: bulk-delete-stories
-server.tool(
-  "bulk-delete-stories",
-  "Deletes multiple stories in Storyblok",
-  {
-    story_ids: z.array(z.string()).min(1).describe("Array of Story IDs to delete.")
-  },
-  async ({ story_ids }) => {
-    const results: Array<{ id: string, status: "success" | "error", error?: string }> = [];
-    let successful_operations = 0;
-    let failed_operations = 0;
-
-    for (const id of story_ids) {
-      try {
-        const endpointPath = `/stories/${id}`;
-        const fullUrl = buildManagementUrl(endpointPath);
-
-        const response = await fetch(fullUrl, {
-          method: 'DELETE',
-          headers: getManagementHeaders(),
-        });
-
-        await handleApiResponse(response, fullUrl); // delete doesn't typically return content, but handleApiResponse checks response.ok
-        results.push({ id, status: "success" });
-        successful_operations++;
-      } catch (error) {
-        results.push({ id, status: "error", error: error instanceof Error ? error.message : String(error) });
-        failed_operations++;
-      }
-    }
-
-    return {
-      content: [{
-        type: "text",
-        text: JSON.stringify({
-          total_processed: story_ids.length,
-          successful_operations,
-          failed_operations,
-          results
-        }, null, 2)
-      }]
-    };
-  }
-);
-
-// Tool: bulk-update-stories
-server.tool(
-  "bulk-update-stories",
-  "Updates multiple stories in Storyblok",
-  {
-    stories: z.array(
-      z.object({
-        id: z.string().describe("Story ID"),
-        name: z.string().optional().describe("Story name"),
-        slug: z.string().optional().describe("Story slug"),
-        content: z.record(z.unknown()).optional().describe("Story content object"),
-        parent_id: z.number().optional().describe("Parent folder ID (cannot be used to move to root, use 0 or null for root)"),
-        is_folder: z.boolean().optional().describe("Whether this is a folder"),
-        is_startpage: z.boolean().optional().describe("Whether this is the startpage"),
-        tag_list: z.array(z.string()).optional().describe("Array of tag names"),
-        publish: z.boolean().optional().default(false).describe("Whether to publish the story after updating")
-      })
-    ).min(1).describe("Array of story objects to update. Each object must have an 'id'.")
-  },
-  async ({ stories }) => {
-    const results: Array<{ id: string, status: "success" | "error", data?: any, error?: string, published?: boolean }> = [];
-    let successful_operations = 0;
-    let failed_operations = 0;
-
-    for (const storyUpdate of stories) {
-      const { id, publish, ...updateFields } = storyUpdate;
-      try {
-        const storyPayload: Record<string, unknown> = {};
-        // Filter out undefined values explicitly, as Storyblok API might interpret them
-        Object.keys(updateFields).forEach(key => {
-          if ((updateFields as any)[key] !== undefined) {
-            storyPayload[key] = (updateFields as any)[key];
-          }
-        });
-
-        const endpointPath = `/stories/${id}`;
-        const fullUrl = buildManagementUrl(endpointPath);
-
-        const response = await fetch(fullUrl, {
-          method: 'PUT',
-          headers: getManagementHeaders(),
-          body: JSON.stringify({ story: storyPayload }), // Storyblok expects { story: { ... } }
-        });
-
-        const data = await handleApiResponse(response, fullUrl);
-        let published = false;
-
-        if (publish) {
-          try {
-            const publishEndpointPath = `/stories/${id}/publish`;
-            const publishFullUrl = buildManagementUrl(publishEndpointPath);
-            const publishResponse = await fetch(publishFullUrl, {
-              method: 'POST',
-              headers: getManagementHeaders(),
-            });
-            await handleApiResponse(publishResponse, publishFullUrl);
-            published = true;
-          } catch (publishError) {
-            // Log publish error but don't fail the update operation itself
-            console.error(`Failed to publish story ${id}:`, publishError);
-            // Optionally add this info to the result for this story
-          }
-        }
-        results.push({ id, status: "success", data, published });
-        successful_operations++;
-      } catch (error) {
-        results.push({ id, status: "error", error: error instanceof Error ? error.message : String(error) });
-        failed_operations++;
-      }
-    }
-
-    return {
-      content: [{
-        type: "text",
-        text: JSON.stringify({
-          total_processed: stories.length,
-          successful_operations,
-          failed_operations,
-          results
-        }, null, 2)
-      }]
-    };
-  }
-);
-
-// Tool: bulk-create-stories
-server.tool(
-  "bulk-create-stories",
-  "Creates multiple stories in Storyblok",
-  {
-    stories: z.array(
-      z.object({
-        name: z.string().describe("Story name"),
-        slug: z.string().describe("Story slug (URL path)"),
-        content: z.record(z.unknown()).describe("Story content object"),
-        parent_id: z.number().optional().describe("Parent folder ID"),
-        is_folder: z.boolean().optional().default(false).describe("Whether this is a folder"),
-        is_startpage: z.boolean().optional().default(false).describe("Whether this is the startpage"),
-        tag_list: z.array(z.string()).optional().describe("Array of tag names")
-      })
-    ).min(1).describe("Array of story objects to create")
-  },
-  async ({ stories }) => {
-    const results: Array<{ input: any, id?: number, slug?: string, status: "success" | "error", data?: any, error?: string }> = [];
-    let successful_operations = 0;
-    let failed_operations = 0;
-
-    for (const storyInput of stories) {
-      try {
-        const storyPayload = { story: storyInput };
-        const endpointPath = '/stories';
-        const fullUrl = buildManagementUrl(endpointPath);
-
-        const response = await fetch(fullUrl, {
-          method: 'POST',
-          headers: getManagementHeaders(),
-          body: JSON.stringify(storyPayload),
-        });
-
-        const data = await handleApiResponse(response, fullUrl); // data.story contains the created story
-        results.push({ input: storyInput, id: data?.story?.id, slug: data?.story?.slug, status: "success", data });
-        successful_operations++;
-      } catch (error) {
-        results.push({ input: storyInput, slug: storyInput.slug, status: "error", error: error instanceof Error ? error.message : String(error) });
-        failed_operations++;
-      }
-    }
-
-    return {
-      content: [{
-        type: "text",
-        text: JSON.stringify({
-          total_processed: stories.length,
-          successful_operations,
-          failed_operations,
-          results
-        }, null, 2)
-      }]
-    };
-  }
-);
+  );
+}

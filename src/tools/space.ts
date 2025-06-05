@@ -16,12 +16,13 @@ export function registerSpaceTools(server: McpServer) {
     {},
     async () => {
       try {
+        const endpoint = buildManagementUrl('');
         const response = await fetch(
-          buildManagementUrl(''),
+          endpoint,
           { headers: getManagementHeaders() }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -52,12 +53,13 @@ export function registerSpaceTools(server: McpServer) {
     {},
     async () => {
       try {
+        const endpoint = `${buildManagementUrl('/stories')}?is_folder=true`;
         const response = await fetch(
-          `${buildManagementUrl('/stories')}?is_folder=true`,
+          endpoint,
           { headers: getManagementHeaders() }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
@@ -93,12 +95,13 @@ export function registerSpaceTools(server: McpServer) {
       try {
         const params = createPaginationParams(page, per_page);
 
+        const endpoint = `${buildManagementUrl('/datasources')}?${params}`;
         const response = await fetch(
-          `${buildManagementUrl('/datasources')}?${params}`,
+          endpoint,
           { headers: getManagementHeaders() }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, endpoint);
         return {
           content: [
             {
