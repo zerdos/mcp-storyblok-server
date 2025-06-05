@@ -7,7 +7,7 @@
 /**
  * Handles uncaught exceptions.
  * Logs the error and exits the process.
- * @param {Error} error - The uncaught exception.
+ * @param {Error} error - The uncaught exception encountered.
  */
 process.on('uncaughtException', (error: Error) => {
   console.error('Uncaught Exception:', error);
@@ -17,7 +17,7 @@ process.on('uncaughtException', (error: Error) => {
 /**
  * Handles unhandled promise rejections.
  * Logs the error and exits the process.
- * @param {any} reason - The reason for the rejection.
+ * @param {any} reason - The reason for the promise rejection.
  * @param {Promise<any>} promise - The promise that was rejected.
  */
 process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
@@ -63,14 +63,14 @@ const server = new McpServer({
 registerAllTools(server);
 
 /**
- * Main server startup function
- * Initializes the MCP server with stdio transport
+ * Main server startup function.
+ * Initializes the MCP server and connects it using STDIN/STDOUT transport.
  */
 async function main() {
   try {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error("MCP Storyblok server is running");
+    console.log("MCP Storyblok server is running"); // Changed to console.log
   } catch (error) {
     console.error("Error starting server:", error);
     process.exit(1);

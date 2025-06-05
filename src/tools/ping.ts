@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import axios from "axios";
+// import axios from "axios"; // Removed axios
 import { config, API_ENDPOINTS } from "../../config/index.js";
 import type { McpToolErrorResponse } from "../../types/index.js";
 
@@ -17,11 +17,13 @@ export function registerPingTool(server: McpServer) {
     {}, // No input schema
     async () => {
       try {
-        const response = await axios.get(
+        const fetchResponse = await fetch(
           `${API_ENDPOINTS.CONTENT}/spaces/${config.spaceId}/?token=${config.publicToken}`
         );
 
-        if (response.status === 200) {
+        if (fetchResponse.ok) { // Check response.ok for success (status 200-299)
+          // Optionally, you might want to parse the JSON if you need data from it
+          // const data = await fetchResponse.json();
           return {
             content: [
               {
@@ -31,41 +33,45 @@ export function registerPingTool(server: McpServer) {
             ],
           };
         } else {
-          return {
+          // Handle HTTP errors (4xx, 5xx)
+          const errorBody = await fetchResponse.text(); // Get error body as text
+          const errorDetails = `Status: ${fetchResponse.status} ${fetchResponse.statusText}, Body: ${errorBody}`;
+          const toolResponse: McpToolErrorResponse = {
             isError: true,
+            errorCode: "STORYBLOK_API_ERROR",
+            errorMessage: "Storyblok API returned an error.",
+            errorDetails: errorDetails,
             content: [
               {
                 type: "text",
-                text: `Server is running, but Storyblok API returned status: ${response.status}.`,
+                text: `Error: STORYBLOK_API_ERROR - Storyblok API returned an error. Details: ${errorDetails}`,
               },
             ],
           };
+          return toolResponse;
         }
       } catch (error: any) {
         console.error("Error in ping tool:", error); // Keep server-side log
 
-        let response: McpToolErrorResponse;
+        let toolResponse: McpToolErrorResponse;
 
-        if (axios.isAxiosError(error)) {
-          // Storyblok API or network error
-          const details = error.response ?
-            `Status: ${error.response.status}, Data: ${JSON.stringify(error.response.data)}, Message: ${error.message}` :
-            error.message;
-          response = {
+        // Differentiate between network errors and other types of errors
+        if (error instanceof TypeError && error.message === "fetch failed") { // Common message for network errors with fetch
+          toolResponse = {
             isError: true,
-            errorCode: "STORYBLOK_API_ERROR",
-            errorMessage: "Storyblok API is unreachable or returned an error.",
-            errorDetails: details,
+            errorCode: "NETWORK_ERROR", // More specific than just STORYBLOK_API_ERROR for fetch failures
+            errorMessage: "Network error when trying to reach Storyblok API.",
+            errorDetails: error.message, // Original error message
             content: [
               {
                 type: "text",
-                text: `Error: STORYBLOK_API_ERROR - Storyblok API is unreachable or returned an error. Details: ${details}`,
+                text: `Error: NETWORK_ERROR - Network error when trying to reach Storyblok API. Details: ${error.message}`,
               },
             ],
           };
         } else if (error.message.includes('STORYBLOK_SPACE_ID') || error.message.includes('STORYBLOK_DEFAULT_PUBLIC_TOKEN') || error.message.includes('environment variable')) {
-          // Configuration errors (often caught during config import, but also possible here if config is somehow bypassed or rechecked)
-           response = {
+          // Configuration errors
+          toolResponse = {
             isError: true,
             errorCode: "CONFIGURATION_ERROR",
             errorMessage: "There is a configuration problem with Storyblok credentials.",
@@ -80,7 +86,7 @@ export function registerPingTool(server: McpServer) {
         } else {
           // Other unexpected errors
           const details = error instanceof Error ? error.message : String(error);
-          response = {
+          toolResponse = {
             isError: true,
             errorCode: "PING_TOOL_ERROR",
             errorMessage: "An unexpected error occurred in the ping tool.",
@@ -93,7 +99,7 @@ export function registerPingTool(server: McpServer) {
             ],
           };
         }
-        return response;
+        return toolResponse;
       }
     }
   );
