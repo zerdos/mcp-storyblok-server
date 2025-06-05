@@ -56,7 +56,7 @@ export function registerPingTool(server: McpServer) {
         let toolResponse: McpToolErrorResponse;
 
         // Differentiate between network errors and other types of errors
-        if (error instanceof TypeError && error.message === "fetch failed") { // Common message for network errors with fetch
+        if (error instanceof TypeError && error.name === "TypeError") { // Generic check for network-related errors
           toolResponse = {
             isError: true,
             errorCode: "NETWORK_ERROR", // More specific than just STORYBLOK_API_ERROR for fetch failures
