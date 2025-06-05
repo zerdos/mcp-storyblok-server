@@ -50,7 +50,7 @@ export function registerPingTool(server: McpServer) {
           };
           return toolResponse;
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error in ping tool:", error); // Keep server-side log
 
         let toolResponse: McpToolErrorResponse;
