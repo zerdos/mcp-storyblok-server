@@ -10,7 +10,6 @@
  * @param {Error} error - The uncaught exception encountered.
  */
 process.on('uncaughtException', (error: Error) => {
-  console.error('Uncaught Exception:', error);
   process.exit(1);
 });
 
@@ -21,7 +20,6 @@ process.on('uncaughtException', (error: Error) => {
  * @param {Promise<any>} promise - The promise that was rejected.
  */
 process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
 });
 
@@ -70,9 +68,7 @@ async function main() {
   try {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.log("MCP Storyblok server is running"); // Changed to console.log
   } catch (error) {
-    console.error("Error starting server:", error);
     process.exit(1);
   }
 }

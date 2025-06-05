@@ -30,7 +30,6 @@ export function registerTagTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in fetch-tags tool:", error);
         return {
           isError: true,
           content: [
@@ -73,7 +72,6 @@ export function registerTagTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in create-tag tool:", error);
         return {
           isError: true,
           content: [
@@ -117,7 +115,6 @@ export function registerTagTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in create-tag-and-add-to-story tool:", error);
         return {
           isError: true,
           content: [
@@ -159,7 +156,6 @@ export function registerTagTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in delete-tag tool:", error);
         return {
           isError: true,
           content: [

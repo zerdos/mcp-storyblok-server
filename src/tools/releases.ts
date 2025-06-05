@@ -37,7 +37,6 @@ export function registerReleaseTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in fetch-releases tool:", error);
         return {
           isError: true,
           content: [
@@ -84,7 +83,6 @@ export function registerReleaseTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in create-release tool:", error);
         return {
           isError: true,
           content: [
@@ -128,7 +126,6 @@ export function registerReleaseTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in add-story-to-release tool:", error);
         return {
           isError: true,
           content: [
@@ -170,7 +167,6 @@ export function registerReleaseTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in publish-release tool:", error);
         return {
           isError: true,
           content: [
@@ -212,7 +208,6 @@ export function registerReleaseTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in delete-release tool:", error);
         return {
           isError: true,
           content: [

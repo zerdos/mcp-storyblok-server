@@ -172,7 +172,6 @@ export function registerStoryTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in fetch-stories tool:", error);
         return {
           isError: true,
           content: [
@@ -208,7 +207,6 @@ export function registerStoryTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in get-story tool:", error);
         return {
           isError: true,
           content: [
@@ -339,7 +337,6 @@ export function registerStoryTools(server: McpServer) {
             finalData = await handleApiResponse(getResponse, getFullUrl);
           } catch (fetchError) {
             // If fetching the full story fails, we can still return the creation data, but add a note.
-            console.error("Error fetching full story after creation:", fetchError);
             finalData = creationData; // Fallback to creation data
             if (publishStatus) {
               finalData.publish_status_note = publishStatus.message + " | Additionally, fetching full story failed: " + (fetchError instanceof Error ? fetchError.message : String(fetchError));
@@ -363,7 +360,6 @@ export function registerStoryTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in create-story tool:", error);
         return {
           isError: true,
           content: [
@@ -431,7 +427,6 @@ export function registerStoryTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in update-story tool:", error);
         return {
           isError: true,
           content: [
@@ -472,7 +467,6 @@ export function registerStoryTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in delete-story tool:", error);
         return {
           isError: true,
           content: [
@@ -513,7 +507,6 @@ export function registerStoryTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in publish-story tool:", error);
         return {
           isError: true,
           content: [
@@ -554,7 +547,6 @@ export function registerStoryTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in unpublish-story tool:", error);
         return {
           isError: true,
           content: [
@@ -590,7 +582,6 @@ export function registerStoryTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in get-story-versions tool:", error);
         return {
           isError: true,
           content: [
@@ -632,7 +623,6 @@ export function registerStoryTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in restore-story tool:", error);
         return {
           isError: true,
           content: [
@@ -756,7 +746,6 @@ export function registerStoryTools(server: McpServer) {
         };
 
       } catch (error) {
-        console.error("Error in validate-story-content tool:", error);
         return {
           isError: true,
           content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }]
@@ -1060,7 +1049,6 @@ export function registerStoryTools(server: McpServer) {
               published = true;
             } catch (publishError) {
               // Log publish error but don't fail the update operation itself
-              console.error(`Failed to publish story ${id}:`, publishError);
               // Optionally add this info to the result for this story
             }
           }

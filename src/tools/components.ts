@@ -62,7 +62,6 @@ export function registerComponentTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in fetch-components tool:", error);
         return {
           isError: true,
           content: [
@@ -100,7 +99,6 @@ export function registerComponentTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in get-component tool:", error);
         return {
           isError: true,
           content: [
@@ -156,7 +154,6 @@ export function registerComponentTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in create-component tool:", error);
         return {
           isError: true,
           content: [
@@ -212,7 +209,6 @@ export function registerComponentTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in update-component tool:", error);
         return {
           isError: true,
           content: [
@@ -253,7 +249,6 @@ export function registerComponentTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in delete-component tool:", error);
         return {
           isError: true,
           content: [
@@ -274,7 +269,6 @@ export async function getComponentSchemaByName(componentName: string, spaceId?: 
   // For now, this example assumes it uses the primary configured space.
   // A real implementation might need to handle different Storyblok clients if spaceId implies different tokens.
   if (spaceId) {
-    console.warn(`getComponentSchemaByName called with spaceId '${spaceId}', but current implementation uses default configured space.`)
   }
 
   const endpoint = buildManagementUrl('/components');
@@ -287,6 +281,5 @@ export async function getComponentSchemaByName(componentName: string, spaceId?: 
       return foundComponent.schema || null; // Return the schema object
     }
   }
-  console.warn(`Component schema for '${componentName}' not found.`);
   return null;
 }

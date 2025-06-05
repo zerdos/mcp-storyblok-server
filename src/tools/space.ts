@@ -32,7 +32,6 @@ export function registerSpaceTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in get-space tool:", error);
         return {
           isError: true,
           content: [
@@ -69,7 +68,6 @@ export function registerSpaceTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in fetch-folders tool:", error);
         return {
           isError: true,
           content: [
@@ -111,7 +109,6 @@ export function registerSpaceTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in fetch-datasources tool:", error);
         return {
           isError: true,
           content: [

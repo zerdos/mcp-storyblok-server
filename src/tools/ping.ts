@@ -48,7 +48,6 @@ export function registerPingTool(server: McpServer) {
           };
         }
       } catch (error: unknown) {
-        console.error("Error in ping tool:", error);
         return {
           isError: true,
           content: [

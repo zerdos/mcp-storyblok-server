@@ -43,7 +43,6 @@ export function registerAssetTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in fetch-assets tool:", error);
         return {
           isError: true,
           content: [
@@ -82,7 +81,6 @@ export function registerAssetTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in get-asset tool:", error);
         return {
           isError: true,
           content: [
@@ -124,7 +122,6 @@ export function registerAssetTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in delete-asset tool:", error);
         return {
           isError: true,
           content: [
@@ -173,7 +170,6 @@ export function registerAssetTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in init-asset-upload tool:", error);
         return {
           isError: true,
           content: [
@@ -215,7 +211,6 @@ export function registerAssetTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in complete-asset-upload tool:", error);
         return {
           isError: true,
           content: [
@@ -252,7 +247,6 @@ export function registerAssetTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in fetch-asset-folders tool:", error);
         return {
           isError: true,
           content: [
@@ -299,7 +293,6 @@ export function registerAssetTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in create-asset-folder tool:", error);
         return {
           isError: true,
           content: [
@@ -343,7 +336,6 @@ export function registerAssetTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in update-asset-folder tool:", error);
         return {
           isError: true,
           content: [
@@ -385,7 +377,6 @@ export function registerAssetTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in delete-asset-folder tool:", error);
         return {
           isError: true,
           content: [

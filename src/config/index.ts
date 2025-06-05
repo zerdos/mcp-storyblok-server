@@ -25,7 +25,6 @@ function validateConfig(): StoryblokConfig {
     throw new Error('STORYBLOK_DEFAULT_PUBLIC_TOKEN environment variable is missing. This token is necessary for read operations via the Content Delivery API (e.g., fetching stories for display).');
   }
 
-  console.log(`Storyblok configuration loaded successfully for space ID: ${spaceId}`);
 
   return {
     spaceId,

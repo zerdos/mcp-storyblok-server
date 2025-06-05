@@ -75,7 +75,6 @@ export function registerSearchTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in search-stories tool:", error);
         return {
           isError: true,
           content: [
@@ -127,7 +126,6 @@ export function registerSearchTools(server: McpServer) {
           ]
         };
       } catch (error) {
-        console.error("Error in get-story-by-slug tool:", error);
         return {
           isError: true,
           content: [

@@ -28,7 +28,6 @@ export function registerMetaTools(server: McpServer) {
           ],
         };
       } catch (error: unknown) {
-        console.error("Error in list_tools tool:", error);
         return {
           isError: true,
           content: [
