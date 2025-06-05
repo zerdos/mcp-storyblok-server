@@ -1,10 +1,43 @@
 import { config, API_ENDPOINTS } from '../config/index.js';
 
 // Helper function to handle API responses
-export async function handleApiResponse(response: Response) {
+export async function handleApiResponse(response: Response, endpoint: string) { // Added endpoint parameter
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`);
+    // Attempt to parse errorText if it's JSON, otherwise use it as a string
+    let errorDetails;
+    try {
+      errorDetails = JSON.parse(errorText);
+    } catch (e) {
+      errorDetails = errorText;
+    }
+
+    let suggestedFix = "Unknown error, please check the details.";
+    switch (response.status) {
+      case 401:
+        suggestedFix = "Check if the API token is correct and has not expired.";
+        break;
+      case 403:
+        suggestedFix = "Check token permissions. Ensure the token has the necessary access rights for this operation on the specified space.";
+        break;
+      case 404:
+        suggestedFix = "The requested resource was not found. Please check the endpoint and resource ID.";
+        break;
+      // Add more cases as needed
+    }
+
+    const enhancedError = {
+      error: `${response.status} ${response.statusText}`,
+      details: errorDetails, // This could be the parsed JSON or the raw text
+      context: {
+        endpoint,
+        spaceId: config.spaceId, // Assuming config.spaceId is available
+        tokenPermissions: "unknown", // Placeholder
+        requiredPermissions: "unknown", // Placeholder
+        suggestedFix,
+      }
+    };
+    throw new Error(JSON.stringify(enhancedError)); // Throw the stringified JSON object
   }
   return response.json();
 }
