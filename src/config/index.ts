@@ -1,20 +1,31 @@
 import type { StoryblokConfig } from '../types/index.js';
 
-// Environment variables validation
+/**
+ * Validates and retrieves the Storyblok configuration from environment variables.
+ *
+ * Ensures that all necessary Storyblok credentials and identifiers are set.
+ * Throws an error if any required environment variable is missing, detailing its impact.
+ * Logs a confirmation message upon successful loading of the configuration.
+ *
+ * @returns {StoryblokConfig} The validated Storyblok configuration object.
+ * @throws {Error} If a required environment variable is not set.
+ */
 function validateConfig(): StoryblokConfig {
   const spaceId = process.env.STORYBLOK_SPACE_ID;
   const managementToken = process.env.STORYBLOK_MANAGEMENT_TOKEN;
   const publicToken = process.env.STORYBLOK_DEFAULT_PUBLIC_TOKEN;
 
   if (!spaceId) {
-    throw new Error('STORYBLOK_SPACE_ID environment variable is required');
+    throw new Error('STORYBLOK_SPACE_ID environment variable is missing. This is crucial for identifying your Storyblok space and without it, no API communication can occur.');
   }
   if (!managementToken) {
-    throw new Error('STORYBLOK_MANAGEMENT_TOKEN environment variable is required');
+    throw new Error('STORYBLOK_MANAGEMENT_TOKEN environment variable is missing. This token is required for all write operations (e.g., creating/updating stories, assets) via the Management API.');
   }
   if (!publicToken) {
-    throw new Error('STORYBLOK_DEFAULT_PUBLIC_TOKEN environment variable is required');
+    throw new Error('STORYBLOK_DEFAULT_PUBLIC_TOKEN environment variable is missing. This token is necessary for read operations via the Content Delivery API (e.g., fetching stories for display).');
   }
+
+  console.log(`Storyblok configuration loaded successfully for space ID: ${spaceId}`);
 
   return {
     spaceId,
@@ -23,9 +34,21 @@ function validateConfig(): StoryblokConfig {
   };
 }
 
+/**
+ * Holds the validated Storyblok configuration.
+ * This object is populated by calling `validateConfig()` at startup.
+ * It contains the space ID, management token, and public token.
+ *
+ * @type {StoryblokConfig}
+ */
 export const config = validateConfig();
 
-// Base URLs for Storyblok APIs
+/**
+ * Defines the base URLs for the Storyblok Management and Content Delivery APIs.
+ *
+ * - `MANAGEMENT`: URL for the Storyblok Management API (v1).
+ * - `CONTENT`: URL for the Storyblok Content Delivery API (v2).
+ */
 export const API_ENDPOINTS = {
   MANAGEMENT: 'https://mapi.storyblok.com/v1',
   CONTENT: 'https://api.storyblok.com/v2'

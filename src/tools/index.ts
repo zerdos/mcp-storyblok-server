@@ -7,6 +7,7 @@ import { registerAssetTools } from './assets.js';
 import { registerComponentTools } from './components.js';
 import { registerSearchTools } from './search.js';
 import { registerSpaceTools } from './space.js';
+import { registerMetaTools } from './meta.js';
 
 /**
  * Register all available tools with the MCP server
@@ -20,10 +21,12 @@ import { registerSpaceTools } from './space.js';
  * - Components: Block/component schema management
  * - Search: Content discovery and filtering
  * - Space: Space-level operations and metadata
+ * - Meta: Tools for server introspection (e.g., listing tools)
  */
 export function registerAllTools(server: McpServer) {
   // Basic tools
   registerPingTool(server);
+  registerMetaTools(server);
   
   // Content management
   registerStoryTools(server);
