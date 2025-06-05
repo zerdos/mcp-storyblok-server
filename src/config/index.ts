@@ -35,13 +35,33 @@ function validateConfig(): StoryblokConfig {
 }
 
 /**
- * Holds the validated Storyblok configuration.
- * This object is populated by calling `validateConfig()` at startup.
- * It contains the space ID, management token, and public token.
- *
- * @type {StoryblokConfig}
+ * Cached configuration instance
  */
-export const config = validateConfig();
+let _config: StoryblokConfig | null = null;
+
+/**
+ * Gets the validated Storyblok configuration.
+ * Uses lazy initialization to avoid failing at module load time.
+ * 
+ * @returns {StoryblokConfig} The validated Storyblok configuration object.
+ */
+export function getConfig(): StoryblokConfig {
+  if (!_config) {
+    _config = validateConfig();
+  }
+  return _config;
+}
+
+/**
+ * Legacy export for backward compatibility.
+ * Note: This will throw an error if environment variables are not set.
+ * Consider using getConfig() for better error handling.
+ */
+export const config = new Proxy({} as StoryblokConfig, {
+  get(target, prop) {
+    return getConfig()[prop as keyof StoryblokConfig];
+  }
+});
 
 /**
  * Defines the base URLs for the Storyblok Management and Content Delivery APIs.
