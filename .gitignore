@@ -1,5 +1,6 @@
 build
 node_modules
+.yarn/install-state.gz
 dist
 .DS_Store
 *.env

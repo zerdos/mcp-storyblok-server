@@ -1,5 +1,4 @@
-import { McpServer, ToolDefinition } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 /**
  * @file src/tools/meta.ts
@@ -16,33 +15,27 @@ export function registerMetaTools(server: McpServer) {
   server.tool(
     "list_tools",
     "Lists all available tools with their names and descriptions.",
-    z.object({}), // No specific inputs needed
+    {}, // No specific inputs needed
     async () => {
       try {
-        const toolList = Array.from(server.tools.values()).map(
-          (tool: ToolDefinition<any, any>) => {
-            return { name: tool.name, description: tool.description };
-          }
-        );
-
-        // Format the output as a list of strings for simple text display
-        const formattedToolList = toolList.map(
-          (tool) => `${tool.name}: ${tool.description}`
+        // Dynamically generate the list of tools from server.tools
+        const toolsInfo = Object.entries(server.tools).map(
+          ([toolName, toolDefinition]) => `${toolName}: ${toolDefinition.description}`
         );
 
         return {
           content: [
-            { type: "text", text: "Available tools:\n" + formattedToolList.join("\n") },
+            { type: "text", text: "Available tools:\n" + toolsInfo.join("\n") },
           ],
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error in list_tools tool:", error);
         return {
           isError: true,
           content: [
             {
               type: "text",
-              text: `Error listing tools: ${error.message}`,
+              text: `Error listing tools: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
         };
