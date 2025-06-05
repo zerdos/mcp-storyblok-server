@@ -10,21 +10,54 @@ export function registerComponentTools(server: McpServer) {
   // Fetch components
   server.tool(
     "fetch-components",
-    "Fetches all components (blocks) from Storyblok space",
-    {},
-    async () => {
+    "Fetches components from Storyblok space, with optional filtering and response shaping.",
+    {
+      component_summary: z.boolean().optional().describe("If true, return only component names, IDs, and display_names."),
+      include_schema_details: z.boolean().optional().default(true).describe("If false, exclude the detailed 'schema' field (used if component_summary is false)."),
+      filter_by_name: z.string().optional().describe("Filter components by name (case-insensitive substring match on 'name' or 'display_name').")
+    },
+    async (params) => {
+      const { component_summary, include_schema_details, filter_by_name } = params;
       try {
-        const response = await fetch(
-          buildManagementUrl('/components'),
-          { headers: getManagementHeaders() }
-        );
+        const endpointUrl = buildManagementUrl('/components');
+        const response = await fetch(endpointUrl, { headers: getManagementHeaders() });
+        const data = await handleApiResponse(response, endpointUrl); // Expects { components: [] }
 
-        const data = await handleApiResponse(response);
+        let components = data.components || [];
+
+        // Apply filter_by_name
+        if (filter_by_name) {
+          const filterLower = filter_by_name.toLowerCase();
+          components = components.filter((comp: any) =>
+            (comp.name && comp.name.toLowerCase().includes(filterLower)) ||
+            (comp.display_name && comp.display_name.toLowerCase().includes(filterLower))
+          );
+        }
+
+        // Apply response shaping
+        if (component_summary) {
+          components = components.map((comp: any) => ({
+            id: comp.id,
+            name: comp.name,
+            display_name: comp.display_name,
+          }));
+        } else if (!include_schema_details) {
+          components = components.map((comp: any) => {
+            const { schema, ...rest } = comp; // Destructure to omit schema
+            return rest;
+          });
+        }
+
+        // The original API call for all components returns an object like { components: [...] }
+        // To maintain consistency or if the user expects that shape, we can return { components: components }
+        // Or, if just the array is fine (more common for a "fetch list" type tool after processing):
+        const finalResponseData = { components_count: components.length, components: components };
+
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(data, null, 2)
+              text: JSON.stringify(finalResponseData, null, 2)
             }
           ]
         };
@@ -57,7 +90,7 @@ export function registerComponentTools(server: McpServer) {
           { headers: getManagementHeaders() }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, buildManagementUrl(`/components/${id}`));
         return {
           content: [
             {
@@ -113,7 +146,7 @@ export function registerComponentTools(server: McpServer) {
           }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, buildManagementUrl('/components'));
         return {
           content: [
             {
@@ -169,7 +202,7 @@ export function registerComponentTools(server: McpServer) {
           }
         );
 
-        const data = await handleApiResponse(response);
+        const data = await handleApiResponse(response, buildManagementUrl(`/components/${id}`));
         return {
           content: [
             {
@@ -210,7 +243,7 @@ export function registerComponentTools(server: McpServer) {
           }
         );
 
-        await handleApiResponse(response);
+        await handleApiResponse(response, buildManagementUrl(`/components/${id}`));
         return {
           content: [
             {
@@ -233,4 +266,27 @@ export function registerComponentTools(server: McpServer) {
       }
     }
   );
+}
+
+// Helper function to get a component's schema by its name
+export async function getComponentSchemaByName(componentName: string, spaceId?: string): Promise<Record<string, unknown> | null> {
+  // If spaceId is provided, it implies a more complex setup, possibly different credentials.
+  // For now, this example assumes it uses the primary configured space.
+  // A real implementation might need to handle different Storyblok clients if spaceId implies different tokens.
+  if (spaceId) {
+    console.warn(`getComponentSchemaByName called with spaceId '${spaceId}', but current implementation uses default configured space.`)
+  }
+
+  const endpoint = buildManagementUrl('/components');
+  const response = await fetch(endpoint, { headers: getManagementHeaders() });
+  const data = await handleApiResponse(response, endpoint); // Assuming data is { components: [] }
+
+  if (data && data.components && Array.isArray(data.components)) {
+    const foundComponent = data.components.find((comp: any) => comp.name === componentName);
+    if (foundComponent) {
+      return foundComponent.schema || null; // Return the schema object
+    }
+  }
+  console.warn(`Component schema for '${componentName}' not found.`);
+  return null;
 }
