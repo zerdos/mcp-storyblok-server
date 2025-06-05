@@ -37,6 +37,8 @@ export function registerPingTool(server: McpServer) {
           const errorDetails = `Status: ${fetchResponse.status} ${fetchResponse.statusText}, Body: ${errorBody}`;
           return {
             isError: true,
+            errorCode: "STORYBLOK_API_ERROR",
+            errorMessage: `Storyblok API returned an error. Details: ${errorDetails}`,
             content: [
               {
                 type: "text",
