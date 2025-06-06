@@ -6,7 +6,7 @@ import {
   buildManagementUrl,
   createPaginationParams,
   addOptionalParams
-} from '../utils/api.js';
+} from '../utils/api';
 
 export function registerAssetTools(server: McpServer) {
   // Fetch assets

@@ -4,7 +4,7 @@ import {
   handleApiResponse, 
   getManagementHeaders, 
   buildManagementUrl
-} from '../utils/api.js';
+} from "../utils/api";
 
 export function registerTagTools(server: McpServer) {
   // Fetch tags
