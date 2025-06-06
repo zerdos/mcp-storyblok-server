@@ -27,13 +27,17 @@ export function registerStoryTools(server: McpServer) {
       include_content: z.boolean().optional().describe("Force content inclusion in results (Storyblok's 'resolve_relations' and 'resolve_links' might be relevant if 'content' is not directly returned for list views without it, or if it means fetching full story objects)."),
       content_status: z.enum(["draft", "published", "both"]).optional().describe("Fetch draft, published, or both versions of stories (maps to Storyblok's 'version' parameter: 'draft' or 'published'. 'both' will require two API calls)."),
       deep_filter: z.record(z.string()).optional().describe("Client-side filter on story content. Provide key-value pairs. Supports dot notation for nested fields, e.g., {'content.field_name': 'value'}."),
-      validate_schema: z.string().optional().describe("Component name to validate stories against. Results added to each story or a separate metadata field.")
+      validate_schema: z.string().optional().describe("Component name to validate stories against. Results added to each story or a separate metadata field."),
+      fields: z.string().optional().describe("Comma-separated list of story fields to return (e.g., 'id,name,slug,content.component,published_at'). If provided, only these fields will be included for each story."),
+      summary_mode: z.boolean().optional().describe("If true, returns a predefined condensed summary of each story. Overridden by the 'fields' parameter if 'fields' is also provided.")
     },
     async (params: StoryFilterParams & {
       include_content?: boolean;
       content_status?: "draft" | "published" | "both";
       deep_filter?: Record<string, string>;
       validate_schema?: string;
+      fields?: string;
+      summary_mode?: boolean;
     }) => {
       try {
         // Helper function to access nested properties
@@ -68,6 +72,26 @@ export function registerStoryTools(server: McpServer) {
           return current;
         };
 
+        // Helper function to set nested properties (needed for summary_mode/fields)
+        const setByPath = (obj: any, path: string, value: any): void => {
+          const parts = path.split('.');
+          let current = obj;
+          for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i];
+            const isNextPartArrayIndex = /^\d+$/.test(parts[i+1]);
+            if (!current[part] || typeof current[part] !== 'object') {
+              current[part] = isNextPartArrayIndex ? [] : {};
+            }
+            current = current[part];
+          }
+          const lastPart = parts[parts.length - 1];
+          if (Array.isArray(current) && /^\d+$/.test(lastPart)) {
+            current[parseInt(lastPart, 10)] = value;
+          } else {
+            current[lastPart] = value;
+          }
+        };
+
         const fetchStoriesForVersion = async (version?: "draft" | "published") => {
           const endpointPath = '/stories';
           const urlParams = createPaginationParams(params.page, params.per_page);
@@ -75,37 +99,53 @@ export function registerStoryTools(server: McpServer) {
             starts_with: params.starts_with,
             by_slugs: params.by_slugs,
             excluding_slugs: params.excluding_slugs,
-            content_type: params.content_type,
+            content_type: params.content_type, // This is pre-existing, for single content_type
             sort_by: params.sort_by,
             search_term: params.search_term,
             version: version,
-            ...(params.include_content && { with_content: 1 }) // Assuming 'with_content=1' works, Storyblok uses 'resolve_relations' or similar
+            ...(params.include_content && { with_content: 1 })
           });
 
           const fullUrl = `${buildManagementUrl(endpointPath)}?${urlParams}`;
-          const response = await fetch(fullUrl, { headers: getManagementHeaders() });
-          return handleApiResponse(response, fullUrl);
+          const apiResponse = await fetch(fullUrl, { headers: getManagementHeaders() });
+          const responseJson = await handleApiResponse(apiResponse, fullUrl);
+          return {
+            stories_data: responseJson.stories || [],
+            total_from_api: responseJson.total || 0,
+          };
         };
 
-        let fetchedData;
+        let stories: any[] = [];
+        let total_items_from_api: number | null = null;
+        const per_page_for_calc = params.per_page || 25;
+
+
         if (params.content_status === "both") {
-          const [draftStoriesResponse, publishedStoriesResponse] = await Promise.all([
+          const [draftData, publishedData] = await Promise.all([
             fetchStoriesForVersion("draft"),
             fetchStoriesForVersion("published")
           ]);
 
-          const draftStories = draftStoriesResponse.stories || [];
-          const publishedStories = publishedStoriesResponse.stories || [];
           const storiesMap = new Map();
-          publishedStories.forEach((story: any) => storiesMap.set(story.id, story));
-          draftStories.forEach((story: any) => storiesMap.set(story.id, story));
-          fetchedData = { stories: Array.from(storiesMap.values()) };
+          (publishedData.stories_data || []).forEach((story: any) => storiesMap.set(story.id, story));
+          (draftData.stories_data || []).forEach((story: any) => storiesMap.set(story.id, story));
+          stories = Array.from(storiesMap.values());
+          total_items_from_api = draftData.total_from_api;
         } else {
-          fetchedData = await fetchStoriesForVersion(params.content_status);
+          const singleVersionData = await fetchStoriesForVersion(params.content_status);
+          stories = singleVersionData.stories_data || [];
+          total_items_from_api = singleVersionData.total_from_api;
         }
 
-        let stories = fetchedData.stories || [];
         let responseMetadata: Record<string, any> = {};
+        if (total_items_from_api !== null) {
+          responseMetadata.total_items_from_api = total_items_from_api;
+          responseMetadata.total_pages_api = Math.ceil(total_items_from_api / per_page_for_calc);
+        }
+         if (params.page) {
+          responseMetadata.current_page = params.page;
+        }
+        responseMetadata.per_page_requested = per_page_for_calc;
 
         // Apply deep_filter
         if (params.deep_filter && Object.keys(params.deep_filter).length > 0) {
@@ -161,7 +201,41 @@ export function registerStoryTools(server: McpServer) {
           }
         }
 
-        const finalResponseData = { responseMetadata: responseMetadata, stories_count: stories.length, stories: stories };
+        // Apply summary_mode if true AND fields is not provided
+        if (params.summary_mode && (!params.fields || params.fields.trim() === "")) {
+          const PREDEFINED_SUMMARY_FIELDS = ['id', 'name', 'slug', 'uuid', 'content.component', 'published_at', 'updated_at', 'created_at', 'parent_id', 'full_slug'];
+          stories = stories.map(story => {
+            const summaryStory: Record<string, any> = {};
+            for (const path of PREDEFINED_SUMMARY_FIELDS) {
+              const value = getValueByPath(story, path);
+              if (value !== undefined) { // Only set if value exists
+                setByPath(summaryStory, path, value);
+              }
+            }
+            return summaryStory;
+          });
+        }
+        // Apply fields projection if params.fields is provided (this will run if summary_mode was false or if fields were also provided)
+        else if (params.fields && params.fields.trim() !== "") {
+          const requestedPaths = params.fields.split(',').map(p => p.trim()).filter(p => p);
+          if (requestedPaths.length > 0) {
+            stories = stories.map(story => {
+              const newStory: Record<string, any> = {};
+              for (const path of requestedPaths) {
+                const value = getValueByPath(story, path);
+                if (value !== undefined) { // Only set if value exists
+                  setByPath(newStory, path, value);
+                }
+              }
+              return newStory;
+            });
+          }
+        }
+
+        const stories_count_current_response = stories.length;
+        responseMetadata.stories_count_current_response = stories_count_current_response;
+
+        const finalResponseData = { ...responseMetadata, stories: stories };
 
         return {
           content: [
@@ -1127,6 +1201,300 @@ export function registerStoryTools(server: McpServer) {
             results
           }, null, 2)
         }]
+      };
+    }
+  );
+
+  // New Tool: fetch-stories-by-component (re-adding with pagination)
+  server.tool(
+    "fetch-stories-by-component",
+    "Fetches stories from Storyblok space filtering by a specific component name in story content or body.",
+    {
+      component_name: z.string().describe("The name of the component to filter by."),
+      content_status: z.enum(["draft", "published", "both"]).optional().default("both").describe("Fetch draft, published, or both versions of stories (default: 'both')."),
+      page: z.number().optional().describe("Page number for pagination (default: 1)"),
+      per_page: z.number().optional().describe("Number of stories per page (default: 25, max: 100)"),
+      starts_with: z.string().optional().describe("Filter by story slug starting with this value (applied before component filtering)."),
+      by_slugs: z.string().optional().describe("Filter by comma-separated story slugs (applied before component filtering)."),
+      excluding_slugs: z.string().optional().describe("Exclude stories with these comma-separated slugs (applied before component filtering)."),
+      sort_by: z.string().optional().describe("Sort field (e.g., 'created_at:desc', 'name:asc'). Applied by Storyblok API."),
+    },
+    async (params: {
+      component_name: string;
+      content_status?: "draft" | "published" | "both";
+      page?: number;
+      per_page?: number;
+      starts_with?: string;
+      by_slugs?: string;
+      excluding_slugs?: string;
+      sort_by?: string;
+    }) => {
+      try {
+        const { component_name, content_status = "both", ...otherApiParams } = params;
+
+        // fetchStoriesForVersion for this tool
+        const fetchStoriesForVersion = async (version?: "draft" | "published") => {
+          const endpointPath = '/stories';
+          const urlParams = createPaginationParams(otherApiParams.page, otherApiParams.per_page);
+          addOptionalParams(urlParams, {
+            starts_with: otherApiParams.starts_with,
+            by_slugs: otherApiParams.by_slugs,
+            excluding_slugs: otherApiParams.excluding_slugs,
+            sort_by: otherApiParams.sort_by,
+            version: version,
+            with_content: 1 // Always fetch content for component filtering
+          });
+
+          const fullUrl = `${buildManagementUrl(endpointPath)}?${urlParams}`;
+          const apiResponse = await fetch(fullUrl, { headers: getManagementHeaders() });
+          const responseJson = await handleApiResponse(apiResponse, fullUrl);
+          return {
+            stories_data: responseJson.stories || [],
+            total_from_api: responseJson.total || 0
+          };
+        };
+
+        let fetchedStoriesData: any[] = [];
+        let api_total_items: number | null = null;
+        const per_page_for_calc = otherApiParams.per_page || 25;
+
+        if (content_status === "both") {
+          const [draftResult, publishedResult] = await Promise.all([
+            fetchStoriesForVersion("draft"),
+            fetchStoriesForVersion("published")
+          ]);
+
+          const storiesMap = new Map();
+          (publishedResult.stories_data || []).forEach((story: any) => storiesMap.set(story.id, story));
+          (draftResult.stories_data || []).forEach((story: any) => storiesMap.set(story.id, story));
+          fetchedStoriesData = Array.from(storiesMap.values());
+          api_total_items = draftResult.total_from_api;
+        } else {
+          const result = await fetchStoriesForVersion(content_status);
+          fetchedStoriesData = result.stories_data || [];
+          api_total_items = result.total_from_api;
+        }
+
+        const filteredStories = fetchedStoriesData.filter(story => {
+          if (!story.content) return false;
+          if (story.content.component === component_name) return true;
+          if (Array.isArray(story.content.body)) {
+            return story.content.body.some((bodyComponent: any) =>
+              bodyComponent && bodyComponent.component === component_name
+            );
+          }
+          return false;
+        });
+
+        let responseMetadata: Record<string, any> = {
+            component_name_filter: component_name,
+            stories_found_after_filter: filteredStories.length,
+        };
+
+        if (api_total_items !== null) {
+            responseMetadata.api_total_items_before_component_filter = api_total_items;
+            responseMetadata.api_total_pages_before_component_filter = Math.ceil(api_total_items / per_page_for_calc);
+        }
+        if (otherApiParams.page) {
+            responseMetadata.current_page_requested = otherApiParams.page;
+        }
+        responseMetadata.per_page_requested = per_page_for_calc;
+
+        const finalResponseData = { ...responseMetadata, stories: filteredStories };
+
+        return {
+          content: [ { type: "text", text: JSON.stringify(finalResponseData, null, 2) } ]
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [ { type: "text", text: `Error in fetch-stories-by-component: ${error instanceof Error ? error.message : String(error)}` } ]
+        };
+      }
+    }
+  );
+
+  // New Tool: search-content
+  server.tool(
+    "search-content",
+    "Searches for a query string within specified fields of story content, with options for content type filtering and deep searching in nested components.",
+    {
+      query: z.string().describe("The text/value to search for within story content fields."),
+      fields_to_search: z.array(z.string()).min(1).describe("Array of field paths within story.content to search the query in (e.g., ['title', 'description', 'body.0.text']). Paths are relative to the 'content' object."),
+      content_types: z.array(z.string()).optional().describe("Array of content type names (component names) to filter stories by. If empty or undefined, all content types are searched."),
+      content_status: z.enum(["draft", "published", "both"]).optional().default("both").describe("Fetch draft, published, or both versions of stories."),
+      deep_search_nested_components: z.boolean().optional().default(false).describe("If true, recursively search within nested components in arrays like 'body' or any field specified in 'fields_to_search' that resolves to an array/object of components."),
+      page: z.number().optional().describe("Page number for pagination (default: 1)."),
+      per_page: z.number().optional().describe("Number of stories per page (default: 25, max: 100).")
+    },
+    async (params: {
+      query: string;
+      fields_to_search: string[];
+      content_types?: string[];
+      content_status?: "draft" | "published" | "both";
+      deep_search_nested_components?: boolean;
+      page?: number;
+      per_page?: number;
+    }) => {
+      const {
+        query,
+        fields_to_search,
+        content_types,
+        content_status = "both",
+        deep_search_nested_components = false,
+        page,
+        per_page
+      } = params;
+
+      // getValueByPath is defined in fetch-stories, ensure it's accessible
+      // (It is, as it's in the same file scope, outside the fetch-stories handler)
+      // If this tool were in a different file, getValueByPath would need to be imported or passed.
+      const getValueByPath = (obj: any, path: string): any => {
+        if (obj === null || obj === undefined || typeof path !== 'string' || path === '') {
+          return undefined;
+        }
+        const parts = path.split('.');
+        let current = obj;
+        for (const part of parts) {
+          if (current === null || current === undefined) return undefined;
+          const isArrayIndex = /^\d+$/.test(part);
+          if (isArrayIndex && Array.isArray(current)) {
+            const index = parseInt(part, 10);
+            if (index >= current.length || index < 0) return undefined;
+            current = current[index];
+          } else if (typeof current === 'object' && current !== null && Object.prototype.hasOwnProperty.call(current, part)) {
+            current = (current as any)[part];
+          } else {
+            return undefined;
+          }
+        }
+        return current;
+      };
+
+      const fetchStoriesForSearch = async (version?: "draft" | "published", apiContentType?: string) => {
+        const endpointPath = '/stories';
+        const urlParams = createPaginationParams(page, per_page);
+        addOptionalParams(urlParams, {
+          version: version,
+          content_type: apiContentType, // Use single content_type for API if applicable
+          with_content: 1 // Always fetch content
+        });
+        const fullUrl = `${buildManagementUrl(endpointPath)}?${urlParams}`;
+        const apiResponse = await fetch(fullUrl, { headers: getManagementHeaders() });
+        const responseJson = await handleApiResponse(apiResponse, fullUrl);
+        return {
+          stories_data: responseJson.stories || [],
+          total_from_api: responseJson.total || 0
+        };
+      };
+
+      let storiesToAnalyze: any[] = [];
+      let total_items_from_api: number | null = null;
+      const per_page_for_calc = per_page || 25;
+
+      // Content Type Handling for API call
+      let apiContentTypeFilter: string | undefined = undefined;
+      if (content_types && content_types.length === 1) {
+        apiContentTypeFilter = content_types[0];
+      }
+
+      if (content_status === "both") {
+        const [draftData, publishedData] = await Promise.all([
+          fetchStoriesForSearch("draft", apiContentTypeFilter),
+          fetchStoriesForSearch("published", apiContentTypeFilter)
+        ]);
+        const storiesMap = new Map();
+        (publishedData.stories_data || []).forEach((story: any) => storiesMap.set(story.id, story));
+        (draftData.stories_data || []).forEach((story: any) => storiesMap.set(story.id, story));
+        storiesToAnalyze = Array.from(storiesMap.values());
+        total_items_from_api = draftData.total_from_api;
+      } else {
+        const result = await fetchStoriesForSearch(content_status, apiContentTypeFilter);
+        storiesToAnalyze = result.stories_data;
+        total_items_from_api = result.total_from_api;
+      }
+
+      // Client-side content_types filter if multiple were given
+      if (content_types && content_types.length > 1) {
+        storiesToAnalyze = storiesToAnalyze.filter((story: any) =>
+          story.content?.component && content_types.includes(story.content.component)
+        );
+        // Note: total_items_from_api would reflect pre-filtering count if this happens.
+      }
+
+      const stories_analyzed_count = storiesToAnalyze.length;
+      const matched_stories: any[] = [];
+      const lowerCaseQuery = query.toLowerCase();
+
+      const recursiveDeepSearch = (currentValue: any, visited: Set<any>): boolean => {
+        if (currentValue === null || currentValue === undefined) return false;
+        if (typeof currentValue === 'string') {
+          return currentValue.toLowerCase().includes(lowerCaseQuery);
+        }
+        if (typeof currentValue !== 'object' || visited.has(currentValue)) {
+            return false; // Primitive (non-string) or already visited
+        }
+        visited.add(currentValue);
+
+        if (Array.isArray(currentValue)) {
+          for (const item of currentValue) {
+            if (recursiveDeepSearch(item, visited)) {
+              visited.delete(currentValue); return true;
+            }
+          }
+        } else { // Object
+          for (const key in currentValue) {
+            if (Object.prototype.hasOwnProperty.call(currentValue, key)) {
+              if (recursiveDeepSearch(currentValue[key], visited)) {
+                visited.delete(currentValue); return true;
+              }
+            }
+          }
+        }
+        visited.delete(currentValue);
+        return false;
+      };
+
+      for (const story of storiesToAnalyze) {
+        if (!story.content) continue;
+        let storyMatched = false;
+        for (const fieldPath of fields_to_search) {
+          const value = getValueByPath(story.content, fieldPath);
+          if (value === undefined) continue;
+
+          if (typeof value === 'string' && value.toLowerCase().includes(lowerCaseQuery)) {
+            storyMatched = true;
+            break;
+          }
+          if (deep_search_nested_components && (Array.isArray(value) || typeof value === 'object')) {
+            if (recursiveDeepSearch(value, new Set())) {
+              storyMatched = true;
+              break;
+            }
+          }
+        }
+        if (storyMatched) {
+          matched_stories.push(story);
+        }
+      }
+
+      let responseMetadata: Record<string, any> = {
+        query: query,
+        fields_searched: fields_to_search,
+        content_types_filter: content_types || "all",
+        deep_search_enabled: deep_search_nested_components,
+        stories_analyzed_count: stories_analyzed_count,
+        matches_found_count: matched_stories.length,
+      };
+      if (total_items_from_api !== null) {
+        responseMetadata.total_items_from_api_before_search = total_items_from_api;
+        responseMetadata.total_pages_api = Math.ceil(total_items_from_api / per_page_for_calc);
+      }
+      if (page) responseMetadata.current_page_requested = page;
+      responseMetadata.per_page_requested = per_page_for_calc;
+
+      return {
+        content: [{ type: "text", text: JSON.stringify({ ...responseMetadata, matched_stories }, null, 2) }]
       };
     }
   );
