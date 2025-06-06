@@ -6,9 +6,9 @@ import {
   buildContentUrl,
   createPaginationParams,
   addOptionalParams
-} from '../utils/api.js';
-import { config } from '../config/index.js';
-import type { SearchParams } from '../types/index.js';
+} from "../utils/api";
+import { config } from '../config/index';
+import type { SearchParams } from '../types/index';
 
 export function registerSearchTools(server: McpServer) {
   // Search stories using Content Delivery API

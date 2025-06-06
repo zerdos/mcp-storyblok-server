@@ -1,4 +1,4 @@
-import { config, API_ENDPOINTS } from '../config/index.js';
+import { config, API_ENDPOINTS } from '../config/index';
 
 // Helper function to handle API responses
 export async function handleApiResponse(response: Response, endpoint: string) { // Added endpoint parameter

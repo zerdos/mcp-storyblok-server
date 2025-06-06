@@ -5,8 +5,8 @@ import {
   getManagementHeaders, 
   buildManagementUrl,
   createPaginationParams
-} from '../utils/api.js';
-import type { PaginationParams } from '../types/index.js';
+} from "../utils/api";
+import type { PaginationParams } from '../types/index';
 
 export function registerSpaceTools(server: McpServer) {
   // Get space information

@@ -6,9 +6,9 @@ import {
   buildManagementUrl,
   createPaginationParams,
   addOptionalParams
-} from '../utils/api.js';
-import type { StoryFilterParams } from '../types/index.js';
-import { getComponentSchemaByName } from '../tools/components.js';
+} from '../utils/api';
+import type { StoryFilterParams } from '../types/index';
+import { getComponentSchemaByName } from '../tools/components';
 
 export function registerStoryTools(server: McpServer) {
   // Fetch stories with filtering

@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 // import axios from "axios"; // Removed axios
-import { config, API_ENDPOINTS } from "../config/index.js";
+import { config, API_ENDPOINTS } from "../config/index";
 
 /**
  * Registers the ping tool with the MCP server.
