@@ -1404,8 +1404,8 @@ export function registerStoryTools(server: McpServer) {
           fetchStoriesForSearch("published", apiContentTypeFilter)
         ]);
         const storiesMap = new Map();
-        (publishedData.stories_data || []).forEach(story => storiesMap.set(story.id, story));
-        (draftData.stories_data || []).forEach(story => storiesMap.set(story.id, story));
+        (publishedData.stories_data || []).forEach((story: any) => storiesMap.set(story.id, story));
+        (draftData.stories_data || []).forEach((story: any) => storiesMap.set(story.id, story));
         storiesToAnalyze = Array.from(storiesMap.values());
         total_items_from_api = draftData.total_from_api;
       } else {
@@ -1416,7 +1416,7 @@ export function registerStoryTools(server: McpServer) {
 
       // Client-side content_types filter if multiple were given
       if (content_types && content_types.length > 1) {
-        storiesToAnalyze = storiesToAnalyze.filter(story =>
+        storiesToAnalyze = storiesToAnalyze.filter((story: any) =>
           story.content?.component && content_types.includes(story.content.component)
         );
         // Note: total_items_from_api would reflect pre-filtering count if this happens.
