@@ -2,5 +2,6 @@
     "cSpell.words": [
         "modelcontextprotocol",
         "startpage"
-    ]
+    ],
+    "typescript.tsdk": "node_modules/typescript/lib"
 }

@@ -1,9 +1,20 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: ['**/tests/**/*.test.ts', '**/?(*.)+(spec|test).ts'], // Adjusted to include a potential top-level tests directory and common naming conventions
-  moduleNameMapper: { // If using path aliases in tsconfig.json, map them here
-    '^@src/(.*)$': '<rootDir>/src/$1' // Example: if you have paths like @src/utils
+  testMatch: ['**/tests/**/*.test.ts', '**/?(*.)+(spec|test).ts'],
+  roots: ['<rootDir>/src', '<rootDir>/tests'],
+  moduleNameMapper: {
+    '^@src/(.*)$': '<rootDir>/src/$1'
   },
-  modulePaths: ['<rootDir>'] // Adding modulePaths to help resolve aliases
+  modulePathIgnorePatterns: ['<rootDir>/build/'],
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.test.ts',
+    '!src/**/__mocks__/**'
+  ],
+  transform: {
+    '^.+\\.ts$': 'ts-jest'
+  },
+  moduleFileExtensions: ['ts', 'js', 'json'],
+  testPathIgnorePatterns: ['<rootDir>/build/', '<rootDir>/node_modules/']
 };

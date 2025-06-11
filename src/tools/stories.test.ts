@@ -1,18 +1,28 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp';
-import { registerStoryTools } from '../stories';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { registerStoryTools } from './stories';
 import {
   handleApiResponse,
-  getManagementHeaders,
   buildManagementUrl,
   createPaginationParams,
   addOptionalParams
-} from '../../utils/api';
-import { getComponentSchemaByName } from '../components'; // This will be the mock
+} from '../utils/api';
+import { getComponentSchemaByName } from './components'; // This will be the mock
+
+// Mock the MCP Server
+jest.mock('@modelcontextprotocol/sdk/server/mcp.js', () => {
+  return {
+    McpServer: jest.fn().mockImplementation(() => {
+      return {
+        tool: jest.fn(),
+      };
+    }),
+  };
+});
 
 // Mock the entire api utility module
-jest.mock('../../utils/api');
+jest.mock('../utils/api');
 // Mock the components module for getComponentSchemaByName
-jest.mock('../components');
+jest.mock('./components');
 
 // Mock global fetch
 global.fetch = jest.fn() as jest.Mock;
@@ -20,9 +30,15 @@ global.fetch = jest.fn() as jest.Mock;
 describe('Story Tools - fetch-stories', () => {
   let server: McpServer;
   let mockFetch: jest.Mock;
+  let mockToolMethod: jest.Mock;
+  let registeredTools: Map<string, Function> = new Map();
 
   beforeEach(() => {
     server = new McpServer({ name: 'test-server', version: '1.0.0' });
+    mockToolMethod = server.tool as jest.Mock;
+    mockToolMethod.mockImplementation((name: string, description: string, schema: any, handler: Function) => {
+      registeredTools.set(name, handler);
+    });
     registerStoryTools(server);
     mockFetch = global.fetch as jest.Mock;
     // Reset mocks before each test
@@ -32,9 +48,9 @@ describe('Story Tools - fetch-stories', () => {
   });
 
   const getTool = (toolName: string) => {
-    const tool = server.getTool(toolName);
-    if (!tool) throw new Error(`Tool ${toolName} not found`);
-    return tool;
+    const handler = registeredTools.get(toolName);
+    if (!handler) throw new Error(`Tool ${toolName} not found`);
+    return { handler };
   };
 
   const mockStoryListResponse = (stories: any[], total: number, perPage: number = 25) => ({
